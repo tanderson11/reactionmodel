@@ -8,6 +8,9 @@ class Species():
         self.name = name
         self.abbreviation = abbreviation
 
+    def __str__(self):
+        return self.abbreviation
+
     def __hash__(self) -> int:
         return hash((self.name, self.abbreviation))
 
@@ -278,7 +281,7 @@ class Model():
             else:
                 species_piece = ' +' if prior_species_flag else ' '*2
             prior_species_flag = True
-            species_piece += self.pad_equally_until(f"{str(int(mult)) if mult < 10 else '>9':.2}{s.abbreviation:.2}", padded_length)
+            species_piece += self.pad_equally_until(f"{str(int(mult)) if mult < 10 else '>9':.2}{s:.2}", padded_length)
             #print(f"piece: |{species_piece}|")
             pretty_side += species_piece
         return pretty_side
