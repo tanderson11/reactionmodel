@@ -3,6 +3,13 @@ from enum import Enum
 from typing import NamedTuple
 from types import FunctionType as function
 
+no_numba = False
+try:
+    from numba import jit, float64
+    from numba.types import Array
+except ModuleNotFoundError:
+    no_numba = True
+
 class Species():
     def __init__(self, name, abbreviation) -> None:
         self.name = name
@@ -130,9 +137,7 @@ class Model():
         self.reaction_index = {r:i for i,r in enumerate(self.reactions)}
 
         if jit:
-            try:
-                from numba import jit
-            except ModuleNotFoundError:
+            if no_numba:
                 raise ModuleNotFoundError("""No module named 'numba'. To use jit=True functions, you must install this package with extras. Try `poetry add "reactionmodel[extras]"` or `pip install "reactionmodel[extras]".""")
             # convert families into relevant lists
             self.k_jit = self.kjit_factory(np.array(self.base_k), self.k_of_ts)
@@ -140,8 +145,7 @@ class Model():
     def kjit_factory(self, base_k, k_families):
         # k_jit can't be an ordinary method because we won't be able to have `self` as an argument in nopython
         # but needs to close around various properties of self, so we define as a closure using this factory function
-        from numba import jit, float64
-        from numba.types import Array
+
         # if we have no explicit time dependence, our k function just returns base_k
         if len(k_families) == 0:
             @jit(Array(float64, 1, "C")(float64), nopython=True)
@@ -218,7 +222,6 @@ class Model():
             self.k_jit
         except AttributeError:
             assert False, "Numba JIT functions may only be acquired if Model was created with jit=True"
-        from numba import jit
 
         @jit(nopython=True)
         def jit_calculate_propensities(t, y):
@@ -239,7 +242,6 @@ class Model():
             self.k_jit
         except AttributeError:
             assert False, "Numba JIT functions may only be acquired if Model was created with jit=True"
-        from numba import jit
 
         jit_calculate_propensities = self.get_jit_propensities_function()
         @jit(nopython=True)
