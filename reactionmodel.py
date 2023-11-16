@@ -99,7 +99,7 @@ class Model():
             elif isinstance(r, ReactionRateFamily):
                 self.reactions.extend(r.reactions)
             else:
-                raise TypeError(f"bad type for reaction in model {type(r)}. Expected Reaction or ReactionRateFamily")
+                raise TypeError(f"bad type for reaction in model: {type(r)}. Expected Reaction or ReactionRateFamily")
 
 
         self.n_species = len(self.species)
