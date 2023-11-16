@@ -146,7 +146,7 @@ class Model():
         if len(k_functions) > 1:
             raise JitNotImplementedError("building a nopython jit for the rate constants isn't supported with more than 1 subcomponent of k having explicit time dependence. Try using a ReactionRateFamily for all reactions and supplying a vectorized k.")
 
-        # now we have noly one subcomponent we have to deal with
+        # now we have only one subcomponent we have to deal with
         k_function, k_slice_bottom, k_slice_top = k_functions[0], k_slice_bottoms[0], k_slice_tops[0]
 
         #@jit(Array(float64, 1, "C")(float64), nopython=True)
@@ -205,6 +205,11 @@ class Model():
         return dydt
 
     def get_jit_propensities_function(self):
+        try:
+            self.k_jit
+        except AttributeError:
+            assert False, "Numba JIT functions may only be acquired if Model was created with jit=True"
+
         @jit(nopython=True)
         def jit_calculate_propensities(t, y):
             # product along column in rate involvement matrix
@@ -220,6 +225,11 @@ class Model():
         return jit_calculate_propensities
 
     def get_jit_dydt_function(self):
+        try:
+            self.k_jit
+        except AttributeError:
+            assert False, "Numba JIT functions may only be acquired if Model was created with jit=True"
+
         jit_calculate_propensities = self.get_jit_propensities_function()
         @jit(nopython=True)
         def jit_dydt(t, y):
@@ -286,22 +296,3 @@ class ReactionRateFamily():
     def __init__(self, reactions, k) -> None:
         self.reactions = reactions
         self.k = k
-
-
-if __name__ == '__main__':
-    from numba import jit, float64
-    from numba.types import Array
-
-    @jit(Array(float64, 1, "C")(float64), nopython=True)
-    def k_jit_family(t):
-        return np.array([1.0, 2.0])
-
-    a = Species("A", 'A')
-    b = Species("B", 'B')
-    r1 = Reaction("A+B->2A", [a,b], [(a,2)])
-    r2 = Reaction("A->0", [a], [], k=2.)
-
-    fam = ReactionRateFamily([r1,r2], k=k_jit_family)
-
-    m = Model([a,b], [fam])
-    m.k_jit(0.)
