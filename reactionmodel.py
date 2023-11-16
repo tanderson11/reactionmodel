@@ -39,6 +39,10 @@ class Reaction():
 
         self.k = k
 
+        if isinstance(reactants, Species) or isinstance(reactants, tuple):
+            reactants = [reactants]
+        if isinstance(products, Species) or isinstance(products, tuple):
+            product = [products]
         self.reactants = set([(r[0] if isinstance(r, tuple)  else r) for r in reactants])
         self.products = set([(p[0] if isinstance(p, tuple)  else p) for p in products])
         self.reactant_data = reactants
@@ -107,7 +111,7 @@ class RateConstantCluster(NamedTuple):
 class Model():
     def __init__(self, species: list[Species], reactions: list[Reaction], parameters=None, jit=False) -> None:
         if isinstance(reactions, Reaction) or isinstance(reactions, ReactionRateFamily):
-            reactions = list(reactions)
+            reactions = [reactions]
         self.species = species
         self.reactions = []
         for r in reactions:
