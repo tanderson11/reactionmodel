@@ -183,20 +183,19 @@ class Model():
         return self.multiplicity_matrix(MultiplicityType.rate_involvement)
 
     def get_propensities_function(self):
-        rate_involvement = self.rate_involvement()
-        def calculate_propensities(t, y, k):
+        def calculate_propensities(t, y):
             # product along column in rate involvement matrix
             # with states raised to power of involvement
             # multiplied by rate constants == propensity
             # dimension of y is expanded to make it a column vector
-            return np.prod(np.expand_dims(y, axis=1)**rate_involvement, axis=0) * k(t)
+            return np.prod(np.expand_dims(y, axis=1)**self.rate_involvement(), axis=0) * self.k(t)
         return calculate_propensities
 
     def get_dydt_function(self):
         calculate_propensities = self.get_propensities_function()
         N = self.stoichiometry()
-        def dydt(t, y, k):
-            propensities = calculate_propensities(t, y, k)
+        def dydt(t, y):
+            propensities = calculate_propensities(t, y)
 
             # each propensity feeds back into the stoich matrix to determine
             # overall rate of change in the state
