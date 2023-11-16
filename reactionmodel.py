@@ -125,6 +125,10 @@ class Model():
         self.reaction_index = {r:i for i,r in enumerate(self.reactions)}
 
         if jit:
+            try:
+                from numba import jit
+            except ModuleNotFoundError:
+                raise ModuleNotFoundError("""No module named 'numba'. To use jit=True functions, you must install this package with extras. Try `poetry add "reactionmodel[extras]"` or `pip install "reactionmodel[extras]".""")
             # convert families into relevant lists
             self.k_jit = self.kjit_factory(np.array(self.base_k), self.k_of_ts)
 
@@ -209,6 +213,7 @@ class Model():
             self.k_jit
         except AttributeError:
             assert False, "Numba JIT functions may only be acquired if Model was created with jit=True"
+        from numba import jit
 
         @jit(nopython=True)
         def jit_calculate_propensities(t, y):
@@ -229,6 +234,7 @@ class Model():
             self.k_jit
         except AttributeError:
             assert False, "Numba JIT functions may only be acquired if Model was created with jit=True"
+        from numba import jit
 
         jit_calculate_propensities = self.get_jit_propensities_function()
         @jit(nopython=True)
