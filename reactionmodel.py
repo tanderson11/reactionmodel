@@ -42,9 +42,9 @@ class Reaction():
         if isinstance(reactants, Species) or isinstance(reactants, tuple):
             reactants = [reactants]
         if isinstance(products, Species) or isinstance(products, tuple):
-            product = [products]
-        self.reactants = set([(r[0] if isinstance(r, tuple)  else r) for r in reactants])
-        self.products = set([(p[0] if isinstance(p, tuple)  else p) for p in products])
+            products = [products]
+        self.reactants = set([(r[0] if isinstance(r, tuple) else r) for r in reactants])
+        self.products = set([(p[0] if isinstance(p, tuple) else p) for p in products])
         self.reactant_data = reactants
         self.product_data = products
 
@@ -112,6 +112,10 @@ class Model():
     def __init__(self, species: list[Species], reactions: list[Reaction], parameters=None, jit=False) -> None:
         if isinstance(reactions, Reaction) or isinstance(reactions, ReactionRateFamily):
             reactions = [reactions]
+        if len(reactions) == 0:
+            raise ValueError("reactions must include at least one reaction.")
+        if len(species) == 0:
+            raise ValueError("species must include at least one species.")
         self.species = species
         self.reactions = []
         for r in reactions:
