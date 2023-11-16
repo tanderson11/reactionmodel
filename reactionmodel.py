@@ -89,6 +89,8 @@ class RateConstantCluster(NamedTuple):
 
 class Model():
     def __init__(self, species: list[Species], reactions: list[Reaction], jit=False) -> None:
+        if isinstance(reactions, Reaction) or isinstance(reactions, ReactionRateFamily):
+            reactions = list(reactions)
         self.species = species
         self.reactions = []
         for r in reactions:
