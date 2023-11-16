@@ -10,9 +10,12 @@ python = "^3.9"
 numpy = "^1.26.2"
 simpleeval = "^0.9.13"
 
-
 [tool.poetry.group.extras.dependencies]
 numba = "^0.58.1"
+
+
+[tool.poetry.group.dev.dependencies]
+ipython = "^8.17.2"
 
 [build-system]
 requires = ["poetry-core"]

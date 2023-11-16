@@ -2,13 +2,15 @@ import numpy as np
 from enum import Enum
 from typing import NamedTuple
 from types import FunctionType as function
+from simpleeval import simple_eval
+from dataclasses import dataclass
 
-no_numba = False
+NO_NUMBA = False
 try:
     from numba import jit, float64
     from numba.types import Array
 except ModuleNotFoundError:
-    no_numba = True
+    NO_NUMBA = True
 
 class Species():
     def __init__(self, name, abbreviation) -> None:
@@ -43,6 +45,14 @@ class Reaction():
         self.product_data  = products
 
         self.rate_involvement = self.reactants if rate_involvement is None else rate_involvement
+
+    def eval_k_with_parameters(self, parameters):
+        if not isinstance(parameters, dict):
+            parameters = parameters.asdict()
+        k = simple_eval(self.k, names=parameters)
+        if not isinstance(k, float):
+            raise ValueError(f"Evaluation of Reaction k defined by the string (s) did not produce a float literal", self.k)
+        return k
 
     def multiplicities(self, mult_type):
         multplicities = {}
@@ -95,7 +105,7 @@ class RateConstantCluster(NamedTuple):
     slice_top: int
 
 class Model():
-    def __init__(self, species: list[Species], reactions: list[Reaction], jit=False) -> None:
+    def __init__(self, species: list[Species], reactions: list[Reaction], parameters=None, jit=False) -> None:
         if isinstance(reactions, Reaction) or isinstance(reactions, ReactionRateFamily):
             reactions = list(reactions)
         self.species = species
@@ -108,36 +118,60 @@ class Model():
             else:
                 raise TypeError(f"bad type for reaction in model: {type(r)}. Expected Reaction or ReactionRateFamily")
 
-
         self.n_species = len(self.species)
         self.n_reactions = len(self.reactions)
 
+        self.species_index = {s:i for i,s in enumerate(self.species)}
+        self.reaction_index = {r:i for i,r in enumerate(self.reactions)}
+
+        self.jit = jit
+        # If the rate constants are specified in a "lazy" way that depends on receiving a Parameters object in the future,
+        # we lock some methods of this class until the rate constants have been "baked" properly
+        self.k_lock = self.bake_k(parameters=parameters)
+
+
+    def bake_k(self, parameters=None):
         # ReactionRateFamilies allow us to calculate k(t) for a group of reactions all at once
         base_k = np.zeros(self.n_reactions)
         k_of_ts = []
         i = 0
         # reactions not self.reactions so we see families
-        for r in reactions:
-            if isinstance(r, Reaction):
-                if isinstance(r.k, float):
-                    base_k[i] = r.k
-                else:
-                    assert(isinstance(r.k, function)), f"a reaction's rate constant should be a float or function with signature k(t) --> float: {r.k}"
-                    k_of_ts.append(RateConstantCluster(r.k, i, i+1))
-                i+=1
+        for r in self.reactions:
+            # in __init__ we guranteed that one of the following is True:
+            # isinstance(r, Reaction) or isinstance(r, ReactionRateFamily)
+            if isinstance(r, ReactionRateFamily):
+                k_of_ts.append(RateConstantCluster(r.k, i, i+len(r.reactions)+1))
+                i += len(r.reactions)
                 continue
-            # reaction rate family
-            k_of_ts.append(RateConstantCluster(r.k, i, i+len(r.reactions)+1))
-            i += len(r.reactions)
+
+            # Only reachable if isinstance(r, Reaction)
+            assert(isinstance(r,Reaction))
+            if isinstance(r.k, str):
+                if parameters is None:
+                    k_lock =  True
+                    notice = "NOTICE: At least one reaction rate constant was a string, but no parameters were provided to decode it. Calculating k(t) will be disabled until Model.bake_k(parameters=parameters) is run."
+                    print(notice)
+                    if self.jit:
+                        self.k_jit = notice
+                    return k_lock
+                base_k[i] = r.eval_k_with_parameters(parameters)
+            elif isinstance(r.k, float):
+                base_k[i] = r.k
+            elif isinstance(r.k, function):
+                k_of_ts.append(RateConstantCluster(r.k, i, i+1))
+            else:
+                raise TypeError(f"a reaction's rate constant should be a float or function with signature k(t) --> float: {r.k}")
+
+            i+=1
 
         self.base_k = base_k
         self.k_of_ts = k_of_ts
 
-        self.species_index = {s:i for i,s in enumerate(self.species)}
-        self.reaction_index = {r:i for i,r in enumerate(self.reactions)}
+        k_lock = False
+        return k_lock
 
-        if jit:
-            if no_numba:
+        if self.jit:
+            if NO_NUMBA:
                 raise ModuleNotFoundError("""No module named 'numba'. To use jit=True functions, you must install this package with extras. Try `poetry add "reactionmodel[extras]"` or `pip install "reactionmodel[extras]".""")
             # convert families into relevant lists
             self.k_jit = self.kjit_factory(np.array(self.base_k), self.k_of_ts)
@@ -183,7 +217,13 @@ class Model():
 
         return matrix
 
+    @staticmethod
+    def check_k_lock(self):
+        if self.k_lock():
+            raise AttributeError("attempted to evaluate k for a Model before rate constants were evaluated. Try `Model.bake_k(parameters=parameters)` first.")
+
     def k(self, t):
+        self.check_k_lock()
         k = self.base_k.copy()
         for family in self.k_of_ts:
             k[family.slice_bottom:family.slice_top] = family.k(t)
