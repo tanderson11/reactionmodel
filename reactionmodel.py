@@ -3,7 +3,7 @@ from enum import Enum
 from typing import NamedTuple
 from types import FunctionType as function
 from simpleeval import simple_eval
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 
 NO_NUMBA = False
 try:
@@ -46,13 +46,13 @@ class Reaction():
         self.reactants = set([(r[0] if isinstance(r, tuple)  else r) for r in reactants])
         self.products = set([(p[0] if isinstance(p, tuple)  else p) for p in products])
         self.reactant_data = reactants
-        self.product_data  = products
+        self.product_data = products
 
         self.rate_involvement = self.reactants if rate_involvement is None else rate_involvement
 
     def eval_k_with_parameters(self, parameters):
         if not isinstance(parameters, dict):
-            parameters = parameters.asdict()
+            parameters = asdict(parameters)
         k = simple_eval(self.k, names=parameters)
         if not isinstance(k, float):
             raise ValueError(f"Evaluation of Reaction k defined by the string (s) did not produce a float literal", self.k)
