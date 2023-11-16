@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "reactionmodel"
+version = "0.1.0"
+description = "A package for defining a set of reaction that converts reactants to products and easily simulating them continuously or stochastically."
+authors = ["Thayer Anderson <tanderson11@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+numpy = "^1.26.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
