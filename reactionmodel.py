@@ -204,6 +204,35 @@ class Model():
             return dydt
         return dydt
 
+    def get_jit_propensities_function(self):
+        @jit(nopython=True)
+        def jit_calculate_propensities(t, y):
+            # product along column in rate involvement matrix
+            # with states raised to power of involvement
+            # multiplied by rate constants == propensity
+            # dimension of y is expanded to make it a column vector
+            intensity_power = np.expand_dims(y, axis=1)**rate_involvement_matrix
+            k = self.k_jit(t)
+            product_down_columns = np.ones(len(k))
+            for i in range(0, len(y)):
+                product_down_columns = product_down_columns * intensity_power[i]
+            return product_down_columns * k
+        return jit_calculate_propensities
+
+    def get_jit_dydt_function(self):
+        jit_calculate_propensities = self.get_jit_propensities_function()
+        @jit(nopython=True)
+        def jit_dydt(t, y):
+            propensities = jit_calculate_propensities(t, y)
+
+            # each propensity feeds back into the stoich matrix to determine
+            # overall rate of change in the state
+            # https://en.wikipedia.org/wiki/Biochemical_systems_equation
+            dydt = N @ propensities
+            return dydt
+
+        return jit_dydt
+
     @staticmethod
     def pad_equally_until(string, length, tie='left'):
         missing_length = length - len(string)
