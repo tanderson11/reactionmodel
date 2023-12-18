@@ -13,9 +13,10 @@ except ModuleNotFoundError:
     NO_NUMBA = True
 
 class Species():
-    def __init__(self, name, abbreviation) -> None:
+    def __init__(self, name, abbreviation=None, description='') -> None:
         self.name = name
-        self.abbreviation = abbreviation
+        self.abbreviation = abbreviation if abbreviation is not None else name
+        self.description = description
 
     def __str__(self):
         return self.abbreviation
@@ -48,6 +49,8 @@ class Reaction():
             products = [products]
         self.reactants = set([(r[0] if isinstance(r, tuple) else r) for r in reactants])
         self.products = set([(p[0] if isinstance(p, tuple) else p) for p in products])
+
+        #print(self.reactants, self.products)
         self.reactant_data = reactants
         self.product_data = products
 
