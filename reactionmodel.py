@@ -20,6 +20,9 @@ class Species():
     def __str__(self):
         return self.abbreviation
 
+    def __format__(self, __format_spec: str) -> str:
+        return format(str(self), __format_spec)
+
     def __hash__(self) -> int:
         return hash((self.name, self.abbreviation))
 
@@ -225,9 +228,8 @@ class Model():
 
         return matrix
 
-    @staticmethod
     def check_k_lock(self):
-        if self.k_lock():
+        if self.k_lock:
             raise AttributeError("attempted to evaluate k for a Model before rate constants were evaluated. Try `Model.bake_k(parameters=parameters)` first.")
 
     def k(self, t):
@@ -333,12 +335,12 @@ class Model():
             else:
                 species_piece = ' +' if prior_species_flag else ' '*2
             prior_species_flag = True
-            species_piece += self.pad_equally_until(f"{str(int(mult)) if mult < 10 else '>9':.2}{s:.2}", padded_length)
+            species_piece += self.pad_equally_until(f"{str(int(mult)) if mult < 10 else '>9':.2}{s}", padded_length)
             #print(f"piece: |{species_piece}|")
             pretty_side += species_piece
         return pretty_side
 
-    def pretty(self, hide_absent=True, skip_blanks=False) -> str:
+    def pretty(self, hide_absent=True, skip_blanks=True, max_width=120) -> str:
         absentee_value = None if hide_absent else 0
         pretty = ""
         for reaction in self.reactions:
