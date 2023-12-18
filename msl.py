@@ -32,13 +32,13 @@ class AtomDecoder():
 class FamilyDecoder(AtomDecoder):
     header = "Family"
     properties = ['members']
-    optional_properties = ['abbreviation', 'description']
+    optional_properties = ['description']
 
 class SpeciesDecoder(AtomDecoder):
     klass = Species
     header = "Species"
     properties = []
-    optional_properties = ['abbreviation', 'description']
+    optional_properties = ['description']
 
 class ReactionDecoder(AtomDecoder):
     klass = Reaction

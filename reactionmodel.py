@@ -13,22 +13,21 @@ except ModuleNotFoundError:
     NO_NUMBA = True
 
 class Species():
-    def __init__(self, name, abbreviation=None, description='') -> None:
+    def __init__(self, name, description='') -> None:
         self.name = name
-        self.abbreviation = abbreviation if abbreviation is not None else name
         self.description = description
 
     def __str__(self):
-        return self.abbreviation
+        return self.name
 
     def __format__(self, __format_spec: str) -> str:
         return format(str(self), __format_spec)
 
     def __hash__(self) -> int:
-        return hash((self.name, self.abbreviation))
+        return hash((self.name))
 
     def __repr__(self) -> str:
-        return f"Species(name={self.name}, abbreviation={self.abbreviation})"
+        return f"Species(name={self.name}, description={self.description})"
 
 class MultiplicityType(Enum):
     reacants = 'reactants'
