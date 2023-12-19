@@ -56,7 +56,10 @@ class Property():
 
     def parse(self, line, syntax):
         pattern = self.get_pattern(syntax)
-        return re.match(pattern, line)
+        match = re.match(pattern, line)
+        if match is not None:
+            return match.groups()
+        return match
 
 class RichProperty(Property):
     value_pattern_string = '"(.*)"$'
@@ -68,10 +71,12 @@ class ListProperty(Property):
         return self.value_pattern_string.format(syntax.list_delimiter)
 
     def parse(self, line, syntax):
-        match = super().parse(line, syntax)
+        match_groups = super().parse(line, syntax)
         # split the list!
-        match[2] = match[2].split(syntax.list_delimiter)
-        return match
+        if match_groups is not None:
+            match_groups = list(match_groups)
+            match_groups[1] = match_groups[1].split(syntax.list_delimiter)
+        return tuple(match_groups)
 
 class Family():
     def __init__(self, members, description=""):
@@ -109,7 +114,7 @@ class Syntax():
     period_equivalent = '.'
 
 class Parser():
-    decoders = [SpeciesDecoder]
+    decoders = [SpeciesDecoder, FamilyDecoder]
 
     def __init__(self, syntax=Syntax(), decoders=None) -> None:
         self.syntax = syntax
@@ -206,7 +211,7 @@ class Parser():
                     break
 
             self.check_match(match, line_body, i+1, f'keyword: value (for the predefined properties of {atom_header})')
-            atom_dictionary[match[1]] = match[2]
+            atom_dictionary[match[0]] = match[1]
             expect_blank = (terminator == self.syntax.period_equivalent)
             i+=1
 
