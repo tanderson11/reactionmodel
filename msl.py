@@ -25,7 +25,7 @@ class AtomDecoder():
             if p not in cls.optional_properties:
                 raise UnexpectedPropertyError(f'{name} had unexpected property {p}')
             optional_ps[p] = v
-        
+
         return cls.klass(name, *ps, **optional_ps)
 
 
@@ -33,6 +33,10 @@ class FamilyDecoder(AtomDecoder):
     header = "Family"
     properties = ['members']
     optional_properties = ['description']
+
+class MatrixDecoder(AtomDecoder):
+    header = "Matrix"
+    properties = ['data']
 
 class SpeciesDecoder(AtomDecoder):
     klass = Species
@@ -59,6 +63,9 @@ class MissingRequiredPropertyError(Exception):
 class UnexpectedPropertyError(Exception):
     pass
 
+class DuplicateAtomNameError(Exception):
+    pass
+
 @dataclass(frozen=True)
 class Syntax():
     atom_separator = '\n'
@@ -74,20 +81,32 @@ class Parser():
         self.syntax = syntax
         # fix the greed:
         self.position_pattern = re.compile(f'^( +)?(.*?)([{syntax.period_equivalent}{syntax.colon_equivalent}])?$')
-        self.header_pattern = re.compile(f'^([a-zA-Z]+) ([a-zA-Z0-9_]+)$')
+        self.header_pattern = re.compile(f'^([a-zA-Z{syntax.family_denoter}]+) ([a-zA-Z0-9_]+)$')
         self.line_pattern = re.compile(f'^([a-z]+): ([a-zA-Z0-9]+)$')
         self.description_pattern = re.compile(f'^(description): "(.*)"$')
         if decoders:
             self.decoders = decoders
         self.decoder_lookup = {d.header: d for d in self.decoders}
 
-    def make_atom(self, atom_header, atom_name, atom_dictionary, atoms, i):
+    def add_atoms(self, atoms, atom_header, atom_name, atom_dictionary, i):
         try:
             relevant_decoder = self.decoder_lookup[atom_header]
         except KeyError:
             raise ModelSyntaxError(f"No decoder found for {atom_header}. L:{i+1}")
+
+        new_atoms = {}
+        if self.syntax.family_denoter in atom_name:
+            # do family stuff TK
+            pass
         
-        return relevant_decoder.decode(atom_name, atom_dictionary, atoms)
+        new_atoms[atom_name] = self.decode_atom(atoms, relevant_decoder, atom_name, atom_dictionary, i)
+        atoms.update(new_atoms)
+        return atoms
+
+    def decode_atom(self, atoms, decoder, atom_name, atom_dictionary, i):
+        if atoms.get(atom_name, None) is not None:
+            raise DuplicateAtomNameError(f"Duplicate atom name {atom_name}. L:{i+1}")
+        return decoder.decode(atom_name, atom_dictionary, atoms)
 
     def parse_file(self, file):
         with open(file, 'r') as f:
@@ -99,7 +118,7 @@ class Parser():
         expect_blank = False
         
         i = 0
-        atoms = []
+        atoms = {}
         atom_dictionary = {}
         atom_header = None
         atom_name = None
@@ -122,9 +141,8 @@ class Parser():
                 if not expect_blank:
                     raise ModelSyntaxError(f"Unexpected blank line. L:{i+1}")
 
-                # build a new atom from name, properties, and all the existing atoms
-                atom = self.make_atom(atom_header, atom_name, atom_dictionary, atoms, i)
-                atoms.append(atom)
+                # build (potentially several -- if family) new atom from name, properties, and all the existing atoms
+                atoms = self.add_atoms(atoms, atom_header, atom_name, atom_dictionary, i)
 
                 expect_blank = False
                 expect_header = True
@@ -159,8 +177,7 @@ class Parser():
             raise ModelSyntaxError(f'ran out of lines while parsing a single unit. Every Species/Reaction/Model should have its last line terminated by a {self.syntax.period_equivalent}')
         
         # make our last atom!
-        atom = self.make_atom(atom_header, atom_name, atom_dictionary, atoms, i)
-        atoms.append(atom)
+        atoms = self.add_atoms(atoms, atom_header, atom_name, atom_dictionary, i)
 
         print(atoms)
     

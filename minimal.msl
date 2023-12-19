@@ -1,2 +1,5 @@
-Species C:
-    description: "carbon".
+Species C12:
+    description: "carbon 12".
+
+Species C13:
+    description: "carbon 13".
