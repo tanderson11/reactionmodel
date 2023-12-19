@@ -275,6 +275,8 @@ class Model():
         except AttributeError:
             assert False, "Numba JIT functions may only be acquired if Model was created with jit=True"
 
+        rate_involvement_matrix = self.rate_involvement()
+
         @jit(nopython=True)
         def jit_calculate_propensities(t, y):
             # product along column in rate involvement matrix
