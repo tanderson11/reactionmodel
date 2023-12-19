@@ -72,10 +72,11 @@ class Parser():
 
     def __init__(self, syntax=Syntax(), decoders=None) -> None:
         self.syntax = syntax
+        # fix the greed:
+        self.position_pattern = re.compile(f'^( +)?(.*?)([{syntax.period_equivalent}{syntax.colon_equivalent}])?$')
         self.header_pattern = re.compile(f'^([a-zA-Z]+) ([a-zA-Z0-9_]+)$')
         self.line_pattern = re.compile(f'^([a-z]+): ([a-zA-Z0-9]+)$')
         self.description_pattern = re.compile(f'^(description): "(.*)"$')
-        self.position_pattern = re.compile(f'^( +)?(.*)([{syntax.period_equivalent}{syntax.colon_equivalent}])')
         if decoders:
             self.decoders = decoders
         self.decoder_lookup = {d.header: d for d in self.decoders}
@@ -106,9 +107,11 @@ class Parser():
         for i,l in enumerate(lines):
             #print(l, l=='', l=='\n', l=='\r')
 
-            line_match = re.match(self.position_pattern, l)
-            self.check_match(line_match, l, i+1, "a valid line")
-            indent, line_body, terminator = line_match[1], line_match[2], line_match[3]
+            postion_match = re.match(self.position_pattern, l)
+            self.check_match(postion_match, l, i+1, "a valid line")
+            indent, line_body, terminator = postion_match[1], postion_match[2], postion_match[3]
+            #print(i)
+            #print(indent, line_body, terminator)
 
             # check if indent is acceptable
             if indent and expect_header:
@@ -118,7 +121,6 @@ class Parser():
             if l==self.syntax.atom_separator:
                 if not expect_blank:
                     raise ModelSyntaxError(f"Unexpected blank line. L:{i+1}")
-                print(atom_header)
 
                 # build a new atom from name, properties, and all the existing atoms
                 atom = self.make_atom(atom_header, atom_name, atom_dictionary, atoms, i)
@@ -133,7 +135,7 @@ class Parser():
 
             if expect_header:
                 match = re.match(self.header_pattern, line_body)
-                self.check_match(match, line_body, i+1, 'Object name(:optional):')
+                self.check_match(match, line_body, i+1, 'ObjectType Name:')
                 atom_header = match[1]
                 atom_name = match[2]
                 expect_header = False
