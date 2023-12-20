@@ -60,7 +60,7 @@ class Reaction():
             parameters = asdict(parameters)
         k = simple_eval(self.k, names=parameters)
         if not isinstance(k, float):
-            raise ValueError(f"Evaluation of Reaction k defined by the string (s) did not produce a float literal", self.k)
+            raise ValueError(f"Evaluation of Reaction k defined by the string {self.k} did not produce a float literal")
         return k
 
     def multiplicities(self, mult_type):

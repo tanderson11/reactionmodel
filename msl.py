@@ -5,12 +5,19 @@ from itertools import product
 
 # model specification language
 
+# Todo:
+## Matrices
+## Rate constant fields for reactions
+## Reaction family rates
+## Models
+
 ## Constraints:
 ### overlapping family names like x and xx might go wild
 ### family names must be only alpha
 
 ## Wishlist:
 ### Wait for full evaluation, so some things can be provided later by the user?
+### Do some processing as macro expansion?
 
 class PropertyMatch():
     def __init__(self, property_name, value):
@@ -96,7 +103,7 @@ class ListProperty(Property):
     match_klass = ListMatch
 
     def inject_syntax(self, syntax):
-        return self.value_pattern_string.format(syntax.list_delimiter)
+        return self.value_pattern_string.format(re.escape(syntax.list_delimiter))
 
     def parse(self, line, syntax):
         property_match = super().parse(line, syntax)
@@ -113,7 +120,7 @@ class SpeciesMultiplicityListProperty(ListProperty):
     value_pattern_string = '([a-zA-Z0-9{0}{1}]+)$'
 
     def inject_syntax(self, syntax):
-        return self.value_pattern_string.format(syntax.list_delimiter, syntax.family_denoter)
+        return self.value_pattern_string.format(re.escape(syntax.list_delimiter), re.escape(syntax.family_denoter))
 
     def parse(self, line, syntax):
         # gets split to a list by superclass
@@ -191,6 +198,16 @@ class ReactionFactory(AtomFactory):
     header = "Reaction"
     properties = [SpeciesMultiplicityListProperty('reactants'), SpeciesMultiplicityListProperty('products'), RichProperty('description', optional=True)]
 
+class Parameter():
+    def __init__(self, name, value) -> None:
+        self.name = name
+        self.value = value
+
+class ParameterFactory(AtomFactory):
+    klass = Parameter
+    header = "Parameter"
+    properties = [Property('value')]
+
 class ModelSyntaxError(Exception):
     pass
 
@@ -220,8 +237,8 @@ class Parser():
 
     def __init__(self, syntax=Syntax(), factories=None) -> None:
         self.syntax = syntax
-        self.position_pattern = re.compile(f'^( +)?(.*?)([{syntax.period_equivalent}{syntax.colon_equivalent}])?$')
-        self.header_pattern = re.compile(f'^([a-zA-Z]+) ([a-zA-Z0-9_\-> \+{syntax.family_denoter}]+)$')
+        self.position_pattern = re.compile(f'^( +)?(.*?)([{re.escape(syntax.period_equivalent)}{re.escape(syntax.colon_equivalent)}])?$')
+        self.header_pattern = re.compile(f'^([a-zA-Z]+) ([a-zA-Z0-9_\-> \+{re.escape(syntax.family_denoter)}]+)$')
         self.family_pattern = re.compile(f'{syntax.family_denoter}([a-zA-Z]+)')
         if factories:
             self.factories = factories
