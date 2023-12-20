@@ -36,8 +36,9 @@ class MultiplicityType(Enum):
     rate_involvement = 'rate involvement'
 
 class Reaction():
-    def __init__(self, description, reactants, products, rate_involvement=None, k=None, reversible=False) -> None:
+    def __init__(self, name, description, reactants, products, rate_involvement=None, k=None, reversible=False) -> None:
         assert reversible == False, "Reversible reactions are not supported. Create separate forward and back reactions instead."
+        self.name = name
         self.description = description
 
         self.k = k

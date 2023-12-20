@@ -31,16 +31,36 @@ class AtomDecoder():
                 v = properties.pop(p)
             except KeyError:
                 raise MissingRequiredPropertyError(f'{name} is missing {p}')
-            ps.append(v)
+            ps.append(v.value)
         for p,v in properties.items():
             if p not in optional_properties:
                 raise UnexpectedPropertyError(f'{name} had unexpected property {p}')
-            optional_ps[p] = v
+            optional_ps[p] = v.value
 
         return cls.klass(name, *ps, **optional_ps)
 
+class PropertyMatch():
+    def __init__(self, property_name, value):
+        self.property_name = property_name
+        self.value = value
+
+    @staticmethod
+    def localize_string_with_family_members(string, syntax, families, chosen_members):
+        for family_name, member in zip(families, chosen_members):
+            string = string.replace(syntax.family_denoter + family_name, syntax.family_denoter + member)
+        return string
+
+    def localize_with_family_members(self, syntax, families, chosen_members):
+        return self.localize_string_with_family_members(self.value, syntax, families, chosen_members)
+
+class ListMatch(PropertyMatch):
+    def localize_with_family_members(self, syntax, families, chosen_members):
+        new_value = [self.localize_string_with_family_members(v, syntax, families, chosen_members) for v in new_value]
+        return new_value
+
 class Property():
     value_pattern_string = '([a-zA-Z0-9]+)$'
+    match_klass = PropertyMatch
     def __init__(self, name, optional=False, alternative=None) -> None:
         self.name = name
         self.optional = optional
@@ -62,32 +82,60 @@ class Property():
         pattern = self.get_pattern(syntax)
         match = re.match(pattern, line)
         if match is not None:
-            return match.groups()
-        return match
+            return self.match_klass(match[1], match[2])
+        return None
 
 class RichProperty(Property):
     value_pattern_string = '"(.*)"$'
 
+class PathProperty(Property):
+    value_pattern_string = '"(.*)"$'
+
+class ReactionProperty(Property):
+    # digits, reaction arrow, family denoter, otherwise same things that can be in a name
+    value_pattern_string = '(.*)$'
+    species_pattern = re.compile('^([0-9]*)(.*?)$')
+
+    def inject_syntax(self, syntax):
+        return self.value_pattern_string.format(syntax.reaction_arrow, syntax.family_denoter)
+
+    def parse(self, line, syntax):
+        match = super().parse(line, syntax)
+        left_side, right_side = match.value.split(syntax.reaction_arrow)
+        for side in (left_side, right_side):
+            side = side.split(' ')
+            for species_string in side:
+                species_match = re.match(self.species_pattern, species_string)
+                if species_match is None:
+                    raise BadSpeciesInReactionError(f"couldn't understand {species_string} as a [multiplicity]SpeciesName")
+                # species multiplicity
+                multiplicity = species_match[1]
+                species = species_match[2]
+        # DO SOMETHING TK TK TK
+
 class ListProperty(Property):
     value_pattern_string = '([a-zA-Z0-9{0}]+)$'
+    match_klass = ListMatch
 
     def inject_syntax(self, syntax):
         return self.value_pattern_string.format(syntax.list_delimiter)
 
     def parse(self, line, syntax):
-        match_groups = super().parse(line, syntax)
+        property_match = super().parse(line, syntax)
         # split the list!
-        if match_groups is not None:
-            match_groups = list(match_groups)
-            match_groups[1] = match_groups[1].split(syntax.list_delimiter)
-        return tuple(match_groups)
+        if property_match is not None:
+            property_match.value = property_match.value.split(syntax.list_delimiter)
+            return property_match
+
+        return None
 
 class Family():
     def __init__(self, name, members, description=""):
+        self.name = name
         self.members = members
         self.description = description
 
-    def __str__(self) -> str:
+    def __repr__(self) -> str:
         return f"Family {self.name}: with members={self.members}"
 
 class FamilyDecoder(AtomDecoder):
@@ -99,6 +147,11 @@ class SpeciesDecoder(AtomDecoder):
     klass = Species
     header = "Species"
     properties = [RichProperty('description', optional=True)]
+
+class ReactionDecoder(AtomDecoder):
+    klass = Reaction
+    header = "Reaction"
+    properties = []
 
 class ModelSyntaxError(Exception):
     pass
@@ -112,6 +165,9 @@ class UnexpectedPropertyError(Exception):
 class DuplicateAtomNameError(Exception):
     pass
 
+class BadSpeciesInReactionError(Exception):
+    pass
+
 @dataclass(frozen=True)
 class Syntax():
     atom_separator = '\n'
@@ -119,6 +175,7 @@ class Syntax():
     list_delimiter = ','
     colon_equivalent = ':'
     period_equivalent = '.'
+    reaction_arrow = '->'
 
 class Parser():
     decoders = [SpeciesDecoder, FamilyDecoder]
@@ -131,19 +188,14 @@ class Parser():
             self.decoders = decoders
         self.decoder_lookup = {d.header: d for d in self.decoders}
 
-    def localize_string_with_family_members(self, string, family_names, member_choices):
-        for family_name, member in zip(family_names, member_choices):
-            string = string.replace(self.syntax.family_denoter + family_name, self.syntax.family_denoter + member)
-        return string
-
-    def localize_atom_dictionary_with_family_members(self, atom_dictionary, family_names, member_choices):
+    def localize_properties_with_family_members(self, atom_properties, family_names, member_choices):
         # member choices == list of ordered pairs (family name, which member)
-        new_dictionary = atom_dictionary.copy()
-        for parameter,param_value in new_dictionary.items():
-            new_dictionary[parameter] = self.localize_string_with_family_members(param_value, family_names, member_choices)
+        new_dictionary = atom_properties.copy()
+        for parameter_name, parameter in new_dictionary.items():
+            new_dictionary[parameter_name] = parameter.localize_with_family_members(self.syntax, family_names, member_choices)
         return new_dictionary
 
-    def add_atoms(self, existing_atoms, decoder, atom_name, atom_dictionary, i):
+    def add_atoms(self, existing_atoms, decoder, atom_name, atom_properties, i):
         new_atoms = {}
         if self.syntax.family_denoter in atom_name:
             _, *families = atom_name.split(self.syntax.family_denoter)
@@ -155,16 +207,17 @@ class Parser():
                 # append the *list*, so we can keep our families straight
                 family_members.append(family.members)
             for combination in product(*family_members):
-                new_atoms[self.localize_string_with_family_members(atom_name, families, combination)] = self.localize_atom_dictionary_with_family_members(atom_dictionary, families, combination)
+                print(combination)
+                new_atoms[PropertyMatch.localize_string_with_family_members(atom_name, self.syntax, families, combination)] = self.localize_properties_with_family_members(atom_properties, families, combination)
         else:
-            new_atoms[atom_name] = self.decode_atom(existing_atoms, decoder, atom_name, atom_dictionary, i)
+            new_atoms[atom_name] = self.decode_atom(existing_atoms, decoder, atom_name, atom_properties, i)
         existing_atoms.update(new_atoms)
         return existing_atoms
 
-    def decode_atom(self, atoms, decoder, atom_name, atom_dictionary, i):
+    def decode_atom(self, atoms, decoder, atom_name, atom_properties, i):
         if atoms.get(atom_name, None) is not None:
             raise DuplicateAtomNameError(f"Duplicate atom name {atom_name}. L:{i+1}")
-        return decoder.decode(atom_name, atom_dictionary, atoms)
+        return decoder.decode(atom_name, atom_properties, atoms)
 
     def parse_file(self, file):
         with open(file, 'r') as f:
@@ -177,7 +230,7 @@ class Parser():
 
         i = 0
         atoms = {}
-        atom_dictionary = {}
+        atom_properties = {}
         atom_header = None
         atom_decoder = None
         atom_name = None
@@ -201,11 +254,11 @@ class Parser():
                     raise ModelSyntaxError(f"Unexpected blank line. L:{i+1}. Did you terminate this unit with a {self.syntax.period_equivalent}?")
 
                 # build (potentially several -- if family) new atoms from name, properties, and all the existing atoms
-                atoms = self.add_atoms(atoms, atom_decoder, atom_name, atom_dictionary, i)
+                atoms = self.add_atoms(atoms, atom_decoder, atom_name, atom_properties, i)
 
                 expect_blank = False
                 expect_header = True
-                atom_dictionary = {}
+                atom_properties = {}
                 atom_header = None
                 atom_name = None
                 atom_decoder = None
@@ -235,7 +288,7 @@ class Parser():
                     break
 
             self.check_match(match, line_body, i+1, f'keyword: value (for the predefined properties of {atom_header})')
-            atom_dictionary[match[0]] = match[1]
+            atom_properties[match.property_name] = match
             expect_blank = (terminator == self.syntax.period_equivalent)
             i+=1
 
@@ -244,7 +297,7 @@ class Parser():
             raise ModelSyntaxError(f'ran out of lines while parsing a single unit. Every Species/Reaction/Model should have its last line terminated by a {self.syntax.period_equivalent}')
 
         # make our last atom!
-        atoms = self.add_atoms(atoms, atom_decoder, atom_name, atom_dictionary, i)
+        atoms = self.add_atoms(atoms, atom_decoder, atom_name, atom_properties, i)
 
         print(atoms)
         return atoms
