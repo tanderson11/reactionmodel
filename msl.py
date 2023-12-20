@@ -133,8 +133,8 @@ class Parser():
 
     def localize_string_with_family_members(self, string, family_names, member_choices):
         for family_name, member in zip(family_names, member_choices):
-            new = string.replace(self.syntax.family_denoter + family_name, self.syntax.family_denoter + member)
-        return new
+            string = string.replace(self.syntax.family_denoter + family_name, self.syntax.family_denoter + member)
+        return string
 
     def localize_atom_dictionary_with_family_members(self, atom_dictionary, family_names, member_choices):
         # member choices == list of ordered pairs (family name, which member)
@@ -198,7 +198,7 @@ class Parser():
             # if blank line, verify that is acceptable and then pipe all previous atom lines together
             if l==self.syntax.atom_separator:
                 if not expect_blank:
-                    raise ModelSyntaxError(f"Unexpected blank line. L:{i+1}")
+                    raise ModelSyntaxError(f"Unexpected blank line. L:{i+1}. Did you terminate this unit with a {self.syntax.period_equivalent}?")
 
                 # build (potentially several -- if family) new atoms from name, properties, and all the existing atoms
                 atoms = self.add_atoms(atoms, atom_decoder, atom_name, atom_dictionary, i)
