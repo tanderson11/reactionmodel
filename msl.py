@@ -1,15 +1,19 @@
+import os
 import re
-from reactionmodel import Species, Reaction, Model
+import numpy as np
+import pandas as pd
 from dataclasses import dataclass
 from itertools import product
+from reactionmodel import Species, Reaction, Model
 
 # model specification language
 
 # Todo:
-## Matrices
 ## Rate constant fields for reactions
 ## Reaction family rates
 ## Models
+## Make a global Patterns object
+## Clarify what a Match object does vs what a Property object does
 
 ## Constraints:
 ### overlapping family names like x and xx might go wild
@@ -25,34 +29,41 @@ class PropertyMatch():
         self.value = value
 
     @staticmethod
-    def localize_string_with_family_members(string, syntax, families, chosen_members):
-        for family_name, member in zip(families, chosen_members):
+    def localize_string_with_family_members(string, syntax, families, chosen_members, idx):
+        for family_name, member, i in zip(families, chosen_members, idx):
             string = string.replace(syntax.family_denoter + family_name, syntax.family_denoter + member)
+            string = string.replace(syntax.family_enumerator + family_name, str(i))
         return string
 
-    def localize_value_with_family_members(self, syntax, families, chosen_members):
-        return self.localize_string_with_family_members(self.value, syntax, families, chosen_members)
+    def localize_value_with_family_members(self, syntax, families, chosen_members, idx):
+        return self.localize_string_with_family_members(self.value, syntax, families, chosen_members, idx)
 
-    def localize_with_family_members(self, syntax, families, chosen_members):
-        value = self.localize_value_with_family_members(syntax, families, chosen_members)
+    def localize_with_family_members(self, syntax, families, chosen_members, idx):
+        value = self.localize_value_with_family_members(syntax, families, chosen_members, idx)
         return self.__class__(self.property_name, value)
 
     def evaluate_with_existing_atoms(self, existing_atoms):
         return self.value
 
+    def handle_macros_before_construction(self, syntax):
+        return self
+
+class ExpressionMatch(PropertyMatch):
+    pass
+
 class ListMatch(PropertyMatch):
-    def localize_value_with_family_members(self, syntax, families, chosen_members):
-        new_value = [self.localize_string_with_family_members(v, syntax, families, chosen_members) for v in self.value]
+    def localize_value_with_family_members(self, syntax, families, chosen_members, idx):
+        new_value = [self.localize_string_with_family_members(v, syntax, families, chosen_members, idx) for v in self.value]
         return new_value
 
 class SpeciesMultiplicityListMatch(ListMatch):
-    def localize_value_with_family_members(self, syntax, families, chosen_members):
+    def localize_value_with_family_members(self, syntax, families, chosen_members, idx):
         new_value = []
         for v in self.value:
             if isinstance(v, tuple):
-                new_value.append((self.localize_string_with_family_members(v[0], syntax, families, chosen_members), v[1]))
+                new_value.append((self.localize_string_with_family_members(v[0], syntax, families, chosen_members, idx), v[1]))
             else:
-                new_value.append(self.localize_string_with_family_members(v, syntax, families, chosen_members))
+                new_value.append(self.localize_string_with_family_members(v, syntax, families, chosen_members, idx))
         return new_value
 
     def evaluate_with_existing_atoms(self, existing_atoms):
@@ -66,7 +77,7 @@ class SpeciesMultiplicityListMatch(ListMatch):
         return actual_list
 
 class Property():
-    value_pattern_string = '([a-zA-Z0-9]+)$'
+    value_pattern_string = '([a-zA-Z0-9\.]+)$'
     match_klass = PropertyMatch
     def __init__(self, name, optional=False, alternative=None) -> None:
         self.name = name
@@ -97,6 +108,10 @@ class RichProperty(Property):
 
 class PathProperty(Property):
     value_pattern_string = '"(.*)"$'
+
+class ExpressionProperty(Property):
+    value_pattern_string = '(.*)$'
+    match_klass = ExpressionMatch
 
 class ListProperty(Property):
     value_pattern_string = '([a-zA-Z0-9{0}]+)$'
@@ -169,7 +184,11 @@ class AtomFactory():
                 raise UnexpectedPropertyError(f'{name} had unexpected property {p}.')
             optional_ps[p] = v.evaluate_with_existing_atoms(existing_atoms)
 
-        return cls.klass(name, *ps, **optional_ps)
+        return cls.from_properties(name, *ps, **optional_ps)
+
+    @classmethod
+    def from_properties(cls, name, *properties, **optional_properties):
+        return cls.klass(name, *properties, **optional_properties)
 
 class Family():
     def __init__(self, name, members, description=""):
@@ -196,17 +215,38 @@ class ReactionFactory(AtomFactory):
     # name, description, reactants, products, rate_involvement=None, k=None, reversible=False
     klass = Reaction
     header = "Reaction"
-    properties = [SpeciesMultiplicityListProperty('reactants'), SpeciesMultiplicityListProperty('products'), RichProperty('description', optional=True)]
+    properties = [SpeciesMultiplicityListProperty('reactants'), SpeciesMultiplicityListProperty('products'), RichProperty('description', optional=True), ExpressionProperty('k', optional=True)]
 
 class Parameter():
     def __init__(self, name, value) -> None:
         self.name = name
         self.value = value
 
+    def __repr__(self) -> str:
+        return f'Parameter(name={self.name}, value={self.value})'
+
 class ParameterFactory(AtomFactory):
     klass = Parameter
     header = "Parameter"
     properties = [Property('value')]
+
+class Matrix():
+    def __init__(self, name, matrix) -> None:
+        self.name = name
+        self.matrix = matrix
+
+    def __repr__(self) -> str:
+        return f'Matrix(name={self.name}, matrix={self.matrix})'
+
+class MatrixFactory(AtomFactory):
+    klass = Matrix
+    header = "Matrix"
+    properties = [PathProperty('path')]
+
+    @classmethod
+    def from_properties(cls, name, path):
+        matrix = np.array(pd.read_csv(path, header=None))
+        return cls.klass(name, matrix)
 
 class ModelSyntaxError(Exception):
     pass
@@ -231,9 +271,10 @@ class Syntax():
     colon_equivalent = ':'
     period_equivalent = '.'
     reaction_arrow = '->'
+    family_enumerator = '#'
 
 class Parser():
-    factories = [SpeciesFactory, FamilyFactory, ReactionFactory]
+    factories = [SpeciesFactory, FamilyFactory, ReactionFactory, ParameterFactory, MatrixFactory]
 
     def __init__(self, syntax=Syntax(), factories=None) -> None:
         self.syntax = syntax
@@ -244,27 +285,32 @@ class Parser():
             self.factories = factories
         self.factory_lookup = {d.header: d for d in self.factories}
 
-    def localize_properties_with_family_members(self, atom_properties, family_names, member_choices):
+    def localize_properties_with_family_members(self, atom_properties, family_names, member_choices, idx):
         # member choices == list of ordered pairs (family name, which member)
         new_dictionary = atom_properties.copy()
-        for parameter_name, parameter in new_dictionary.items():
-            new_dictionary[parameter_name] = parameter.localize_with_family_members(self.syntax, family_names, member_choices)
+        for property_name, property in new_dictionary.items():
+            new_dictionary[property_name] = property.localize_with_family_members(self.syntax, family_names, member_choices, idx)
         return new_dictionary
+
+    @staticmethod
+    def enumerated_product(*args):
+        yield from zip(product(*(range(len(x)) for x in args)), product(*args))
 
     def add_atoms(self, existing_atoms, factory, atom_name, atom_properties):
         new_atoms = {}
         if self.syntax.family_denoter in atom_name:
             families = set(re.findall(self.family_pattern, atom_name))
             family_members = []
+
             for family_name in families:
                 family = existing_atoms.get(family_name, None)
                 if family is None or not(isinstance(family, Family)):
                     raise ModelSyntaxError(f"looked for family {family_name} but couldn't find its definition.")
                 # append the *list*, so we can keep our families straight
                 family_members.append(family.members)
-            for combination in product(*family_members):
-                localized_name = PropertyMatch.localize_string_with_family_members(atom_name, self.syntax, families, combination)
-                localized_properties = self.localize_properties_with_family_members(atom_properties, families, combination)
+            for idx, combination in self.enumerated_product(*family_members):
+                localized_name = PropertyMatch.localize_string_with_family_members(atom_name, self.syntax, families, combination, idx)
+                localized_properties = self.localize_properties_with_family_members(atom_properties, families, combination, idx)
                 new_atoms[localized_name] = self.construct_atom(existing_atoms, factory, localized_name, localized_properties)
         else:
             new_atoms[atom_name] = self.construct_atom(existing_atoms, factory, atom_name, atom_properties)
@@ -272,12 +318,17 @@ class Parser():
         return existing_atoms
 
     def construct_atom(self, atoms, factory, atom_name, atom_properties):
+        new_atom_properties = {}
+        for property_name, property in atom_properties.items():
+            new_atom_properties[property_name] = property.handle_macros_before_construction(self.syntax)
         if atoms.get(atom_name, None) is not None:
             raise DuplicateAtomNameError(f"Duplicate atom name {atom_name}.")
         return factory.construct(atom_name, atom_properties, atoms)
 
     def parse_file(self, file):
-        with open(file, 'r') as f:
+        path = os.path.abspath(file)
+        os.chdir(os.path.dirname(path))
+        with open(path, 'r') as f:
             raw = f.readlines()
         return self.parse_lines(raw)
 

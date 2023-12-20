@@ -10,7 +10,14 @@ Species X_i:
 Species Y_j
     description: "a Y_j".
 
+Parameter x:
+    value: 10.1.
+
+Matrix Q:
+    path: "./q.csv".
+
 Reaction X_i + Y_j -> 2Y_j:
     reactants: X_i,Y_j
     products: 2Y_j
-    description: "Y_j converts X_i to Y_j".
+    description: "Y_j converts X_i to Y_j"
+    k: x * Q[#i,#j].
