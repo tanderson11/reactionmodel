@@ -1,8 +1,12 @@
 import re
 from reactionmodel import Species, Reaction, Model
 from dataclasses import dataclass
+from itertools import product
 
 # model specification language
+
+## Bad constraints:
+### overlapping family names like x and xx will go wild
 
 class AtomDecoder():
     klass = None
@@ -79,9 +83,12 @@ class ListProperty(Property):
         return tuple(match_groups)
 
 class Family():
-    def __init__(self, members, description=""):
+    def __init__(self, name, members, description=""):
         self.members = members
         self.description = description
+
+    def __str__(self) -> str:
+        return f"Family {self.name}: with members={self.members}"
 
 class FamilyDecoder(AtomDecoder):
     klass = Family
@@ -118,22 +125,39 @@ class Parser():
 
     def __init__(self, syntax=Syntax(), decoders=None) -> None:
         self.syntax = syntax
-        # fix the greed:
         self.position_pattern = re.compile(f'^( +)?(.*?)([{syntax.period_equivalent}{syntax.colon_equivalent}])?$')
         self.header_pattern = re.compile(f'^([a-zA-Z{syntax.family_denoter}]+) ([a-zA-Z0-9_]+)$')
-        self.line_pattern = re.compile(f'^([a-z]+): ([a-zA-Z0-9]+)$')
-        self.description_pattern = re.compile(f'^(description): "(.*)"$')
         if decoders:
             self.decoders = decoders
         self.decoder_lookup = {d.header: d for d in self.decoders}
 
+    def localize_string_with_family_members(self, string, family_names, member_choices):
+        for family_name, member in zip(family_names, member_choices):
+            new = string.replace(self.syntax.family_denoter + family_name, self.syntax.family_denoter + member)
+        return new
+
+    def localize_atom_dictionary_with_family_members(self, atom_dictionary, family_names, member_choices):
+        # member choices == list of ordered pairs (family name, which member)
+        new_dictionary = atom_dictionary.copy()
+        for parameter,param_value in new_dictionary.items():
+            new_dictionary[parameter] = self.localize_string_with_family_members(param_value, family_names, member_choices)
+        return new_dictionary
+
     def add_atoms(self, existing_atoms, decoder, atom_name, atom_dictionary, i):
         new_atoms = {}
         if self.syntax.family_denoter in atom_name:
-            # do family stuff TK
-            pass
-
-        new_atoms[atom_name] = self.decode_atom(existing_atoms, decoder, atom_name, atom_dictionary, i)
+            _, *families = atom_name.split(self.syntax.family_denoter)
+            family_members = []
+            for family_name in families:
+                family = existing_atoms.get(family_name, None)
+                if family is None or not(isinstance(family, Family)):
+                    raise ModelSyntaxError(f"looked for family {family_name} but couldn't find its definition. L {i+1}")
+                # append the *list*, so we can keep our families straight
+                family_members.append(family.members)
+            for combination in product(*family_members):
+                new_atoms[self.localize_string_with_family_members(atom_name, families, combination)] = self.localize_atom_dictionary_with_family_members(atom_dictionary, families, combination)
+        else:
+            new_atoms[atom_name] = self.decode_atom(existing_atoms, decoder, atom_name, atom_dictionary, i)
         existing_atoms.update(new_atoms)
         return existing_atoms
 
