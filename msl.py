@@ -40,14 +40,12 @@ class ListMatch(PropertyMatch):
 
 class SpeciesMultiplicityListMatch(ListMatch):
     def localize_value_with_family_members(self, syntax, families, chosen_members):
-        print(self.value)
         new_value = []
         for v in self.value:
             if isinstance(v, tuple):
                 new_value.append((self.localize_string_with_family_members(v[0], syntax, families, chosen_members), v[1]))
             else:
                 new_value.append(self.localize_string_with_family_members(v, syntax, families, chosen_members))
-        print(new_value)
         return new_value
 
     def evaluate_with_existing_atoms(self, existing_atoms):
@@ -82,7 +80,6 @@ class Property():
 
     def parse(self, line, syntax):
         pattern = self.get_pattern(syntax)
-        print(pattern)
         match = re.match(pattern, line)
         if match is not None:
             return self.match_klass(match[1], match[2])
@@ -241,7 +238,6 @@ class Parser():
         new_atoms = {}
         if self.syntax.family_denoter in atom_name:
             families = set(re.findall(self.family_pattern, atom_name))
-            print("HERE", families)
             family_members = []
             for family_name in families:
                 family = existing_atoms.get(family_name, None)
@@ -250,7 +246,6 @@ class Parser():
                 # append the *list*, so we can keep our families straight
                 family_members.append(family.members)
             for combination in product(*family_members):
-                print(combination)
                 localized_name = PropertyMatch.localize_string_with_family_members(atom_name, self.syntax, families, combination)
                 localized_properties = self.localize_properties_with_family_members(atom_properties, families, combination)
                 new_atoms[localized_name] = self.construct_atom(existing_atoms, factory, localized_name, localized_properties)
@@ -310,7 +305,6 @@ class Parser():
 
                 if expect_header:
                     match = re.match(self.header_pattern, line_body)
-                    print(line_body)
                     self.check_match(match, line_body, 'ObjectType Name:')
                     atom_header = match[1]
                     atom_name = match[2]
@@ -359,6 +353,4 @@ if __name__ == '__main__':
     p = Parser()
     atoms = p.parse_file(sys.argv[1])
     for name, atom in atoms.items():
-        print("NAME:", name)
-        print("TYPE:", type(atom))
         print(atom)

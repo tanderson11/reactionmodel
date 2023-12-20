@@ -108,6 +108,13 @@ class Reaction():
     def __repr__(self) -> str:
         return f"Reaction(name={self.name}, description={self.description}, reactants={self.reactant_data}, products={self.product_data}, rate_involvement={self.rate_involvement}, k={self.k})"
 
+    def __str__(self) -> str:
+        reactants = [str(r) if isinstance(r, Species) else (str(r[0]), r[1]) for r in self.reactant_data]
+        products  = [str(p) if isinstance(p, Species) else (str(p[0]), p[1]) for p in self.product_data]
+        rate_involvement = [str(s) if isinstance(s, Species) else (str(s[0]), s[1]) for s in self.rate_involvement]
+
+        return f"Reaction: {self.name}, reactants={reactants}, products={products}, rate_involvement={rate_involvement}, k={self.k}"
+
 class RateConstantCluster(NamedTuple):
     k: function
     slice_bottom: int
