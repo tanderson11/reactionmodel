@@ -3,41 +3,15 @@ from reactionmodel import Species, Reaction, Model
 from dataclasses import dataclass
 from itertools import product
 
+
+### OKAY: INSTEAD OF PASSING ATOM_DICTIONARY
+### PASS A LIST OF PROPERTY MATCHES
+### EACH PROPERTY MATCH OBJECT KNOWS HOW TO LOCALIZE ITSELF
+
 # model specification language
 
 ## Bad constraints:
 ### overlapping family names like x and xx will go wild
-
-class AtomDecoder():
-    klass = None
-    properties = []
-    optional_properties = []
-
-    @classmethod
-    def decode_property(cls, name, value):
-        return value
-
-    @classmethod
-    def decode(cls, name, properties, existing_atoms={}):
-        ps = []
-        optional_ps = {}
-
-        required_properties = [p.name for p in cls.properties if not p.optional]
-        optional_properties = [p.name for p in cls.properties if p.optional]
-
-        # go through required properties IN ORDER
-        for p in required_properties:
-            try:
-                v = properties.pop(p)
-            except KeyError:
-                raise MissingRequiredPropertyError(f'{name} is missing {p}')
-            ps.append(v.value)
-        for p,v in properties.items():
-            if p not in optional_properties:
-                raise UnexpectedPropertyError(f'{name} had unexpected property {p}')
-            optional_ps[p] = v.value
-
-        return cls.klass(name, *ps, **optional_ps)
 
 class PropertyMatch():
     def __init__(self, property_name, value):
@@ -128,6 +102,37 @@ class ListProperty(Property):
             return property_match
 
         return None
+
+class AtomDecoder():
+    klass = None
+    properties = []
+    optional_properties = []
+
+    @classmethod
+    def decode_property(cls, name, value):
+        return value
+
+    @classmethod
+    def decode(cls, name, properties, existing_atoms={}):
+        ps = []
+        optional_ps = {}
+
+        required_properties = [p.name for p in cls.properties if not p.optional]
+        optional_properties = [p.name for p in cls.properties if p.optional]
+
+        # go through required properties IN ORDER
+        for p in required_properties:
+            try:
+                v = properties.pop(p)
+            except KeyError:
+                raise MissingRequiredPropertyError(f'{name} is missing {p}')
+            ps.append(v.value)
+        for p,v in properties.items():
+            if p not in optional_properties:
+                raise UnexpectedPropertyError(f'{name} had unexpected property {p}')
+            optional_ps[p] = v.value
+
+        return cls.klass(name, *ps, **optional_ps)
 
 class Family():
     def __init__(self, name, members, description=""):
