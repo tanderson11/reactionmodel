@@ -36,7 +36,7 @@ class MultiplicityType(Enum):
     rate_involvement = 'rate involvement'
 
 class Reaction():
-    def __init__(self, name, description, reactants, products, rate_involvement=None, k=None, reversible=False) -> None:
+    def __init__(self, name, reactants, products, description='', rate_involvement=None, k=None, reversible=False) -> None:
         assert reversible == False, "Reversible reactions are not supported. Create separate forward and back reactions instead."
         self.name = name
         self.description = description
@@ -50,7 +50,6 @@ class Reaction():
         self.reactants = set([(r[0] if isinstance(r, tuple) else r) for r in reactants])
         self.products = set([(p[0] if isinstance(p, tuple) else p) for p in products])
 
-        #print(self.reactants, self.products)
         self.reactant_data = reactants
         self.product_data = products
 
@@ -107,7 +106,7 @@ class Reaction():
         return self.multiplicities(MultiplicityType.rate_involvement)
 
     def __repr__(self) -> str:
-        return f"Reaction(description={self.description}, reactants={self.reactant_data}, products={self.product_data}, rate_involvement={self.rate_involvement}, k={self.k})"
+        return f"Reaction(name={self.name}, description={self.description}, reactants={self.reactant_data}, products={self.product_data}, rate_involvement={self.rate_involvement}, k={self.k})"
 
 class RateConstantCluster(NamedTuple):
     k: function

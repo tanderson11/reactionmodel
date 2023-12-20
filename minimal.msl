@@ -3,3 +3,8 @@ Family i:
 
 Species C_i:
     description: "carbon 12 at site _i".
+
+Reaction C_i + C_i -> 2C_i:
+    reactants: C_i,C_i
+    products: 2C_i
+    description: "nothing really happens to C_i!".

@@ -3,15 +3,14 @@ from reactionmodel import Species, Reaction, Model
 from dataclasses import dataclass
 from itertools import product
 
-
-### OKAY: INSTEAD OF PASSING ATOM_DICTIONARY
-### PASS A LIST OF PROPERTY MATCHES
-### EACH PROPERTY MATCH OBJECT KNOWS HOW TO LOCALIZE ITSELF
-
 # model specification language
 
-## Bad constraints:
-### overlapping family names like x and xx will go wild
+## Constraints:
+### overlapping family names like x and xx might go wild
+### family names must be only alpha
+
+## Wishlist:
+### Wait for full evaluation, so some things can be provided later by the user?
 
 class PropertyMatch():
     def __init__(self, property_name, value):
@@ -24,13 +23,42 @@ class PropertyMatch():
             string = string.replace(syntax.family_denoter + family_name, syntax.family_denoter + member)
         return string
 
-    def localize_with_family_members(self, syntax, families, chosen_members):
+    def localize_value_with_family_members(self, syntax, families, chosen_members):
         return self.localize_string_with_family_members(self.value, syntax, families, chosen_members)
 
-class ListMatch(PropertyMatch):
     def localize_with_family_members(self, syntax, families, chosen_members):
-        new_value = [self.localize_string_with_family_members(v, syntax, families, chosen_members) for v in new_value]
+        value = self.localize_value_with_family_members(syntax, families, chosen_members)
+        return self.__class__(self.property_name, value)
+
+    def evaluate_with_existing_atoms(self, existing_atoms):
+        return self.value
+
+class ListMatch(PropertyMatch):
+    def localize_value_with_family_members(self, syntax, families, chosen_members):
+        new_value = [self.localize_string_with_family_members(v, syntax, families, chosen_members) for v in self.value]
         return new_value
+
+class SpeciesMultiplicityListMatch(ListMatch):
+    def localize_value_with_family_members(self, syntax, families, chosen_members):
+        print(self.value)
+        new_value = []
+        for v in self.value:
+            if isinstance(v, tuple):
+                new_value.append((self.localize_string_with_family_members(v[0], syntax, families, chosen_members), v[1]))
+            else:
+                new_value.append(self.localize_string_with_family_members(v, syntax, families, chosen_members))
+        print(new_value)
+        return new_value
+
+    def evaluate_with_existing_atoms(self, existing_atoms):
+        actual_list = []
+        for v in self.value:
+            # tuple like (species_name, multiplicity)
+            if isinstance(v, tuple):
+                actual_list.append((existing_atoms[v[0]], v[1]))
+            else:
+                actual_list.append(existing_atoms[v])
+        return actual_list
 
 class Property():
     value_pattern_string = '([a-zA-Z0-9]+)$'
@@ -54,6 +82,7 @@ class Property():
 
     def parse(self, line, syntax):
         pattern = self.get_pattern(syntax)
+        print(pattern)
         match = re.match(pattern, line)
         if match is not None:
             return self.match_klass(match[1], match[2])
@@ -64,28 +93,6 @@ class RichProperty(Property):
 
 class PathProperty(Property):
     value_pattern_string = '"(.*)"$'
-
-class ReactionProperty(Property):
-    # digits, reaction arrow, family denoter, otherwise same things that can be in a name
-    value_pattern_string = '(.*)$'
-    species_pattern = re.compile('^([0-9]*)(.*?)$')
-
-    def inject_syntax(self, syntax):
-        return self.value_pattern_string.format(syntax.reaction_arrow, syntax.family_denoter)
-
-    def parse(self, line, syntax):
-        match = super().parse(line, syntax)
-        left_side, right_side = match.value.split(syntax.reaction_arrow)
-        for side in (left_side, right_side):
-            side = side.split(' ')
-            for species_string in side:
-                species_match = re.match(self.species_pattern, species_string)
-                if species_match is None:
-                    raise BadSpeciesInReactionError(f"couldn't understand {species_string} as a [multiplicity]SpeciesName")
-                # species multiplicity
-                multiplicity = species_match[1]
-                species = species_match[2]
-        # DO SOMETHING TK TK TK
 
 class ListProperty(Property):
     value_pattern_string = '([a-zA-Z0-9{0}]+)$'
@@ -103,17 +110,43 @@ class ListProperty(Property):
 
         return None
 
-class AtomDecoder():
+class SpeciesMultiplicityListProperty(ListProperty):
+    match_klass = SpeciesMultiplicityListMatch
+    species_pattern = re.compile('^([0-9]*)(.*?)$')
+    value_pattern_string = '([a-zA-Z0-9{0}{1}]+)$'
+
+    def inject_syntax(self, syntax):
+        return self.value_pattern_string.format(syntax.list_delimiter, syntax.family_denoter)
+
+    def parse(self, line, syntax):
+        # gets split to a list by superclass
+        # now we format the list as tuples of (species, multplicity) or just species if multiplicity = 1
+        property_match = super().parse(line, syntax)
+        if property_match is None:
+            return property_match
+
+        species_multiplicity_list = []
+        for species_string in property_match.value:
+            species_match = re.match(self.species_pattern, species_string)
+            if species_match is None:
+                raise BadSpeciesInReactionError(f"couldn't understand {species_string} as a [multiplicity]SpeciesName.")
+            multiplicity = species_match[1]
+            species = species_match[2]
+            if multiplicity:
+                species_multiplicity_list.append((species, int(multiplicity)))
+            else:
+                species_multiplicity_list.append(species)
+
+        property_match.value = species_multiplicity_list
+        return property_match
+
+class AtomFactory():
     klass = None
     properties = []
     optional_properties = []
 
     @classmethod
-    def decode_property(cls, name, value):
-        return value
-
-    @classmethod
-    def decode(cls, name, properties, existing_atoms={}):
+    def construct(cls, name, property_matches, existing_atoms={}):
         ps = []
         optional_ps = {}
 
@@ -123,14 +156,14 @@ class AtomDecoder():
         # go through required properties IN ORDER
         for p in required_properties:
             try:
-                v = properties.pop(p)
+                v = property_matches.pop(p)
             except KeyError:
-                raise MissingRequiredPropertyError(f'{name} is missing {p}')
-            ps.append(v.value)
-        for p,v in properties.items():
+                raise MissingRequiredPropertyError(f'{name} is missing {p}.')
+            ps.append(v.evaluate_with_existing_atoms(existing_atoms))
+        for p,v in property_matches.items():
             if p not in optional_properties:
-                raise UnexpectedPropertyError(f'{name} had unexpected property {p}')
-            optional_ps[p] = v.value
+                raise UnexpectedPropertyError(f'{name} had unexpected property {p}.')
+            optional_ps[p] = v.evaluate_with_existing_atoms(existing_atoms)
 
         return cls.klass(name, *ps, **optional_ps)
 
@@ -138,25 +171,28 @@ class Family():
     def __init__(self, name, members, description=""):
         self.name = name
         self.members = members
+        if members is None:
+            raise ValueError(f"family {name} has None members.")
         self.description = description
 
     def __repr__(self) -> str:
         return f"Family {self.name}: with members={self.members}"
 
-class FamilyDecoder(AtomDecoder):
+class FamilyFactory(AtomFactory):
     klass = Family
     header = "Family"
     properties = [ListProperty('members'), Property('description', optional=True)]
 
-class SpeciesDecoder(AtomDecoder):
+class SpeciesFactory(AtomFactory):
     klass = Species
     header = "Species"
     properties = [RichProperty('description', optional=True)]
 
-class ReactionDecoder(AtomDecoder):
+class ReactionFactory(AtomFactory):
+    # name, description, reactants, products, rate_involvement=None, k=None, reversible=False
     klass = Reaction
     header = "Reaction"
-    properties = []
+    properties = [SpeciesMultiplicityListProperty('reactants'), SpeciesMultiplicityListProperty('products'), RichProperty('description', optional=True)]
 
 class ModelSyntaxError(Exception):
     pass
@@ -183,15 +219,16 @@ class Syntax():
     reaction_arrow = '->'
 
 class Parser():
-    decoders = [SpeciesDecoder, FamilyDecoder]
+    factories = [SpeciesFactory, FamilyFactory, ReactionFactory]
 
-    def __init__(self, syntax=Syntax(), decoders=None) -> None:
+    def __init__(self, syntax=Syntax(), factories=None) -> None:
         self.syntax = syntax
         self.position_pattern = re.compile(f'^( +)?(.*?)([{syntax.period_equivalent}{syntax.colon_equivalent}])?$')
-        self.header_pattern = re.compile(f'^([a-zA-Z{syntax.family_denoter}]+) ([a-zA-Z0-9_]+)$')
-        if decoders:
-            self.decoders = decoders
-        self.decoder_lookup = {d.header: d for d in self.decoders}
+        self.header_pattern = re.compile(f'^([a-zA-Z]+) ([a-zA-Z0-9_\-> \+{syntax.family_denoter}]+)$')
+        self.family_pattern = re.compile(f'{syntax.family_denoter}([a-zA-Z]+)')
+        if factories:
+            self.factories = factories
+        self.factory_lookup = {d.header: d for d in self.factories}
 
     def localize_properties_with_family_members(self, atom_properties, family_names, member_choices):
         # member choices == list of ordered pairs (family name, which member)
@@ -200,29 +237,32 @@ class Parser():
             new_dictionary[parameter_name] = parameter.localize_with_family_members(self.syntax, family_names, member_choices)
         return new_dictionary
 
-    def add_atoms(self, existing_atoms, decoder, atom_name, atom_properties, i):
+    def add_atoms(self, existing_atoms, factory, atom_name, atom_properties):
         new_atoms = {}
         if self.syntax.family_denoter in atom_name:
-            _, *families = atom_name.split(self.syntax.family_denoter)
+            families = set(re.findall(self.family_pattern, atom_name))
+            print("HERE", families)
             family_members = []
             for family_name in families:
                 family = existing_atoms.get(family_name, None)
                 if family is None or not(isinstance(family, Family)):
-                    raise ModelSyntaxError(f"looked for family {family_name} but couldn't find its definition. L {i+1}")
+                    raise ModelSyntaxError(f"looked for family {family_name} but couldn't find its definition.")
                 # append the *list*, so we can keep our families straight
                 family_members.append(family.members)
             for combination in product(*family_members):
                 print(combination)
-                new_atoms[PropertyMatch.localize_string_with_family_members(atom_name, self.syntax, families, combination)] = self.localize_properties_with_family_members(atom_properties, families, combination)
+                localized_name = PropertyMatch.localize_string_with_family_members(atom_name, self.syntax, families, combination)
+                localized_properties = self.localize_properties_with_family_members(atom_properties, families, combination)
+                new_atoms[localized_name] = self.construct_atom(existing_atoms, factory, localized_name, localized_properties)
         else:
-            new_atoms[atom_name] = self.decode_atom(existing_atoms, decoder, atom_name, atom_properties, i)
+            new_atoms[atom_name] = self.construct_atom(existing_atoms, factory, atom_name, atom_properties)
         existing_atoms.update(new_atoms)
         return existing_atoms
 
-    def decode_atom(self, atoms, decoder, atom_name, atom_properties, i):
+    def construct_atom(self, atoms, factory, atom_name, atom_properties):
         if atoms.get(atom_name, None) is not None:
-            raise DuplicateAtomNameError(f"Duplicate atom name {atom_name}. L:{i+1}")
-        return decoder.decode(atom_name, atom_properties, atoms)
+            raise DuplicateAtomNameError(f"Duplicate atom name {atom_name}.")
+        return factory.construct(atom_name, atom_properties, atoms)
 
     def parse_file(self, file):
         with open(file, 'r') as f:
@@ -237,82 +277,88 @@ class Parser():
         atoms = {}
         atom_properties = {}
         atom_header = None
-        atom_decoder = None
+        atom_factory = None
         atom_name = None
         whitespace = None
         for i,l in enumerate(lines):
-            #print(l, l=='', l=='\n', l=='\r')
+            try:
+                postion_match = re.match(self.position_pattern, l)
+                self.check_match(postion_match, l, "a valid line")
+                indent, line_body, terminator = postion_match[1], postion_match[2], postion_match[3]
+                #print(i)
+                #print(indent, line_body, terminator)
 
-            postion_match = re.match(self.position_pattern, l)
-            self.check_match(postion_match, l, i+1, "a valid line")
-            indent, line_body, terminator = postion_match[1], postion_match[2], postion_match[3]
-            #print(i)
-            #print(indent, line_body, terminator)
+                # check if indent is acceptable
+                if indent and expect_header:
+                    raise ModelSyntaxError(f"Unexpected indent.")
 
-            # check if indent is acceptable
-            if indent and expect_header:
-                raise ModelSyntaxError(f"Unexpected indent. L:{i+1}")
+                # if blank line, verify that is acceptable and then pipe all previous atom lines together
+                if l==self.syntax.atom_separator:
+                    if not expect_blank:
+                        raise ModelSyntaxError(f"Unexpected blank line. Did you terminate this unit with a {self.syntax.period_equivalent}?")
 
-            # if blank line, verify that is acceptable and then pipe all previous atom lines together
-            if l==self.syntax.atom_separator:
-                if not expect_blank:
-                    raise ModelSyntaxError(f"Unexpected blank line. L:{i+1}. Did you terminate this unit with a {self.syntax.period_equivalent}?")
+                    # build (potentially several -- if family) new atoms from name, properties, and all the existing atoms
+                    atoms = self.add_atoms(atoms, atom_factory, atom_name, atom_properties)
 
-                # build (potentially several -- if family) new atoms from name, properties, and all the existing atoms
-                atoms = self.add_atoms(atoms, atom_decoder, atom_name, atom_properties, i)
+                    expect_blank = False
+                    expect_header = True
+                    atom_properties = {}
+                    atom_header = None
+                    atom_name = None
+                    atom_factory = None
+                    continue
 
-                expect_blank = False
-                expect_header = True
-                atom_properties = {}
-                atom_header = None
-                atom_name = None
-                atom_decoder = None
-                continue
+                if expect_header:
+                    match = re.match(self.header_pattern, line_body)
+                    print(line_body)
+                    self.check_match(match, line_body, 'ObjectType Name:')
+                    atom_header = match[1]
+                    atom_name = match[2]
+                    try:
+                        atom_factory = self.factory_lookup[atom_header]
+                    except KeyError:
+                        raise ModelSyntaxError(f"No means to create {atom_header} (no factory).")
+                    expect_header = False
+                    expect_blank = (terminator == self.syntax.period_equivalent)
+                    continue
 
-            if expect_header:
-                match = re.match(self.header_pattern, line_body)
-                self.check_match(match, line_body, i+1, 'ObjectType Name:')
-                atom_header = match[1]
-                atom_name = match[2]
-                try:
-                    atom_decoder = self.decoder_lookup[atom_header]
-                except KeyError:
-                    raise ModelSyntaxError(f"No decoder found for {atom_header}. L:{i+1}")
-                expect_header = False
+                if whitespace is None:
+                    whitespace = indent
+                if whitespace != indent:
+                    raise ModelSyntaxError(f'Inconsistent whitespace before property: value pair: "{l}"')
+
+                for property_parser in atom_factory.properties:
+                    match = property_parser.parse(line_body, self.syntax)
+                    if match is not None:
+                        break
+
+                self.check_match(match, line_body, f'keyword: value (for the predefined properties of {atom_header})')
+                atom_properties[match.property_name] = match
                 expect_blank = (terminator == self.syntax.period_equivalent)
-                continue
-
-            if whitespace is None:
-                whitespace = indent
-            if whitespace != indent:
-                raise ModelSyntaxError(f'Inconsistent whitespace before property: value pair: "{l}" on L{i+1}')
-
-            for property_parser in atom_decoder.properties:
-                match = property_parser.parse(line_body, self.syntax)
-                if match is not None:
-                    break
-
-            self.check_match(match, line_body, i+1, f'keyword: value (for the predefined properties of {atom_header})')
-            atom_properties[match.property_name] = match
-            expect_blank = (terminator == self.syntax.period_equivalent)
+            except Exception as e:
+                print(f"While parsing L:{i+1}:")
+                raise e
             i+=1
 
         # for loop over; we are out of lines
         if not expect_blank:
-            raise ModelSyntaxError(f'ran out of lines while parsing a single unit. Every Species/Reaction/Model should have its last line terminated by a {self.syntax.period_equivalent}')
+            raise ModelSyntaxError(f'ran out of lines while parsing a single unit. Every Species/Reaction/Model should have its last line terminated by a "{self.syntax.period_equivalent}".')
 
         # make our last atom!
-        atoms = self.add_atoms(atoms, atom_decoder, atom_name, atom_properties, i)
+        atoms = self.add_atoms(atoms, atom_factory, atom_name, atom_properties)
 
-        print(atoms)
         return atoms
 
     @staticmethod
-    def check_match(match, line, i, expected):
+    def check_match(match, line, expected):
         if match is None:
-            raise ModelSyntaxError(f'expected to find a {expected} but found "{line}" on L:{i}')
+            raise ModelSyntaxError(f'expected to find a {expected} but found "{line}".')
 
 if __name__ == '__main__':
     import sys
     p = Parser()
-    p.parse_file(sys.argv[1])
+    atoms = p.parse_file(sys.argv[1])
+    for name, atom in atoms.items():
+        print("NAME:", name)
+        print("TYPE:", type(atom))
+        print(atom)

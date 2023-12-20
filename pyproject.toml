@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "reactionmodel"
 version = "0.1.0"
-description = "A package for defining a set of reaction that converts reactants to products and easily simulating them continuously or stochastically."
+description = "A package for defining a set of reactions which convert reactants to products and easily simulating them deterministically or stochastically."
 authors = ["Thayer Anderson <tanderson11@gmail.com>"]
 readme = "README.md"
 
