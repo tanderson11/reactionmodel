@@ -10,8 +10,12 @@ Species X_i:
 Species Y_j:
     description: "a Y_j".
 
+Species Catalyst:
+    description: "a catalyst".
+
 Reaction X_i + Y_j -> 2Y_j:
     reactants: X_i,Y_j
     products: 2Y_j
+    rate_involvement: X_i,Y_j,Catalyst
     description: "Y_j converts X_i to Y_j"
     k: z * Q[#i][#j].
