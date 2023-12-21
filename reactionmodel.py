@@ -9,6 +9,7 @@ NO_NUMBA = False
 try:
     from numba import jit, float64
     from numba.types import Array
+    from numba.core.registry import CPUDispatcher
 except ModuleNotFoundError:
     NO_NUMBA = True
 
@@ -195,10 +196,10 @@ class Model():
                 base_k[i] = r.eval_k_with_parameters(parameters)
             elif isinstance(r.k, float):
                 base_k[i] = r.k
-            elif isinstance(r.k, function):
+            elif isinstance(r.k, function) or (self.jit and isinstance(r.k, CPUDispatcher)):
                 k_of_ts.append(RateConstantCluster(r.k, i, i+1))
             else:
-                raise TypeError(f"a reaction's rate constant should be a float or function with signature k(t) --> float: {r.k}")
+                raise TypeError(f"a reaction's rate constant should be, a float, a string expression (evaluated --> float when given parameters), or function with signature k(t) --> float: {r} had {r.k}")
 
             i+=1
 
