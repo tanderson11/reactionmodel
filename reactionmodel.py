@@ -144,7 +144,8 @@ class Model():
         self.reactions = []
         used_species = set()
         for r in reactions:
-            used_species.add(r.used())
+            for s in r.used():
+                used_species.add(s)
             if isinstance(r, Reaction):
                 self.reactions.append(r)
             elif isinstance(r, ReactionRateFamily):
@@ -391,5 +392,6 @@ class ReactionRateFamily():
     def used(self):
         used = set()
         for r in self.reactions:
-            used.add(r.products.union(r.reactants).union(r.rate_involved_species))
+            for s in r.used():
+                used.add(s)
         return used
