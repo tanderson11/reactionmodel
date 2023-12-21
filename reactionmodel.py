@@ -49,7 +49,8 @@ class Reaction():
             products = [products]
         self.reactants = set([(r[0] if isinstance(r, tuple) else r) for r in reactants])
         self.products = set([(p[0] if isinstance(p, tuple) else p) for p in products])
-        self.rate_involved_species = set([(r[0] if isinstance(r, tuple) else r) for r in rate_involvement])
+        if rate_involvement is not None:
+            self.rate_involved_species = set([(r[0] if isinstance(r, tuple) else r) for r in rate_involvement])
 
         self.reactant_data = reactants
         self.product_data = products
