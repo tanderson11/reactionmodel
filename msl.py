@@ -9,13 +9,8 @@ from reactionmodel import ReactionRateFamily, Species, Reaction, Model
 
 # model specification language
 
-## Do I actually want parameters to be specified in model files? The point is that models get specified at parameters a lot more often than they (the models) are invented
-
 # Todo:
-## Rate constant fields for reactions
 ## Reaction family rates
-## Models
-## Make a global Patterns object
 ## Clarify what a Match object does vs what a Property object does
 
 ## Constraints:
@@ -233,12 +228,13 @@ class DerivedParameter(Parameter):
         self.description = description
     
     def evaluate(self, other_parameters):
-        print(f"Evaluating expression: {self.value}")
         value = simple_eval(self.value, names=other_parameters)
         try:
             value = np.float64(value)
         except ValueError:
             raise ValueError(f"Evaluation of Reaction k defined by the string {self.value} did not produce a float literal (produced {value})")
+        print(f"Evaluating expression: {self.value} => {value}")
+
         self.value = value
 
     def __repr__(self) -> str:
@@ -400,8 +396,6 @@ class Parser():
                 postion_match = re.match(self.position_pattern, l)
                 self.check_match(postion_match, l, "a valid line")
                 indent, line_body, terminator = postion_match[1], postion_match[2], postion_match[3]
-                #print(i)
-                #print(indent, line_body, terminator)
 
                 # check if indent is acceptable
                 if indent and expect_header:
