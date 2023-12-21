@@ -63,6 +63,7 @@ class SpeciesMultiplicityListMatch(ListMatch):
 
     def evaluate_with_existing_atoms(self, existing_atoms):
         actual_list = []
+
         for v in self.value:
             # tuple like (species_name, multiplicity)
             if isinstance(v, tuple):
@@ -141,6 +142,10 @@ class SpeciesMultiplicityListProperty(ListProperty):
 
         species_multiplicity_list = []
         for species_string in property_match.value:
+            if species_string == syntax.null_set:
+                assert(len(property_match.value) == 1, "Null set signifier found in a list with more than 1 element.")
+                species_multiplicity_list = []
+                break
             species_match = re.match(self.species_pattern, species_string)
             if species_match is None:
                 raise BadSpeciesInReactionError(f"couldn't understand {species_string} as a [multiplicity]SpeciesName.")
@@ -293,6 +298,7 @@ class Syntax():
     period_equivalent = '.'
     reaction_arrow = '->'
     family_enumerator = '#'
+    null_set = 'NULL'
 
 class Parser():
     model_factories = [SpeciesFactory, FamilyFactory, ReactionFactory]
