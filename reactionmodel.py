@@ -111,6 +111,9 @@ class Reaction():
     def rate_involvement(self):
         return self.multiplicities(MultiplicityType.rate_involvement)
 
+    def used(self):
+        return self.products.union(self.reactants).union(self.rate_involved_species)
+
     def __repr__(self) -> str:
         return f"Reaction(name={self.name}, description={self.description}, reactants={self.reactant_data}, products={self.product_data}, rate_involvement={self.rate_involvement}, k={self.k})"
 
@@ -141,8 +144,7 @@ class Model():
         self.reactions = []
         used_species = set()
         for r in reactions:
-            for s in r.products.union(r.reactants).union(r.rate_involved_species):
-                used_species.add(s)
+            used_species.add(r.used())
             if isinstance(r, Reaction):
                 self.reactions.append(r)
             elif isinstance(r, ReactionRateFamily):
@@ -385,3 +387,9 @@ class ReactionRateFamily():
     def __init__(self, reactions, k) -> None:
         self.reactions = reactions
         self.k = k
+
+    def used(self):
+        used = set()
+        for r in self.reactions:
+            used.add(r.products.union(r.reactants).union(r.rate_involved_species))
+        return used
