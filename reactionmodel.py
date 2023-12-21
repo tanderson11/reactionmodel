@@ -58,9 +58,12 @@ class Reaction():
     def eval_k_with_parameters(self, parameters):
         if not isinstance(parameters, dict):
             parameters = asdict(parameters)
+        print(f"Evaluating expression: {self.k}")
         k = simple_eval(self.k, names=parameters)
-        if not isinstance(k, float):
-            raise ValueError(f"Evaluation of Reaction k defined by the string {self.k} did not produce a float literal")
+        try:
+            k = float(k)
+        except ValueError:
+            raise ValueError(f"Evaluation of Reaction k defined by the string {self.k} did not produce a float literal (produced {k})")
         return k
 
     def multiplicities(self, mult_type):
@@ -120,6 +123,9 @@ class RateConstantCluster(NamedTuple):
     slice_bottom: int
     slice_top: int
 
+class UnusedSpeciesError(Exception):
+    pass
+
 class Model():
     def __init__(self, species: list[Species], reactions: list[Reaction], parameters=None, jit=False) -> None:
         if isinstance(reactions, Reaction) or isinstance(reactions, ReactionRateFamily):
@@ -130,7 +136,10 @@ class Model():
             raise ValueError("species must include at least one species.")
         self.species = species
         self.reactions = []
+        used_species = set()
         for r in reactions:
+            for s in r.products.union(r.reactants):
+                used_species.add(s)
             if isinstance(r, Reaction):
                 self.reactions.append(r)
             elif isinstance(r, ReactionRateFamily):
@@ -149,6 +158,9 @@ class Model():
         # we lock some methods of this class until the rate constants have been "baked" properly
         self.k_lock = self.bake_k(parameters=parameters)
 
+        for s in self.species:
+            if s not in used_species:
+                raise UnusedSpeciesError(f'species {s} is not used in any reactions')
 
     def bake_k(self, parameters=None):
         # ReactionRateFamilies allow us to calculate k(t) for a group of reactions all at once

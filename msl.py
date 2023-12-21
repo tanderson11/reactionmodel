@@ -4,9 +4,12 @@ import numpy as np
 import pandas as pd
 from dataclasses import dataclass
 from itertools import product
-from reactionmodel import Species, Reaction, Model
+from simpleeval import simple_eval
+from reactionmodel import ReactionRateFamily, Species, Reaction, Model
 
 # model specification language
+
+## Do I actually want parameters to be specified in model files? The point is that models get specified at parameters a lot more often than they (the models) are invented
 
 # Todo:
 ## Rate constant fields for reactions
@@ -44,9 +47,6 @@ class PropertyMatch():
 
     def evaluate_with_existing_atoms(self, existing_atoms):
         return self.value
-
-    def handle_macros_before_construction(self, syntax):
-        return self
 
 class ExpressionMatch(PropertyMatch):
     pass
@@ -218,17 +218,42 @@ class ReactionFactory(AtomFactory):
     properties = [SpeciesMultiplicityListProperty('reactants'), SpeciesMultiplicityListProperty('products'), RichProperty('description', optional=True), ExpressionProperty('k', optional=True)]
 
 class Parameter():
-    def __init__(self, name, value) -> None:
+    def __init__(self, name, value, description='') -> None:
         self.name = name
+        self.value = np.float64(value)
+        self.description = description
+
+    def __repr__(self) -> str:
+        return f'Parameter(name={self.name}, value={self.value}, description={self.description})'
+
+class DerivedParameter(Parameter):
+    def __init__(self, name, value, description='') -> None:
+        self.name = name
+        self.value = value
+        self.description = description
+    
+    def evaluate(self, other_parameters):
+        print(f"Evaluating expression: {self.value}")
+        value = simple_eval(self.value, names=other_parameters)
+        try:
+            value = np.float64(value)
+        except ValueError:
+            raise ValueError(f"Evaluation of Reaction k defined by the string {self.value} did not produce a float literal (produced {value})")
         self.value = value
 
     def __repr__(self) -> str:
-        return f'Parameter(name={self.name}, value={self.value})'
+        return f'DerivedParameter(name={self.name}, value={self.value}, description={self.description})'
 
 class ParameterFactory(AtomFactory):
     klass = Parameter
     header = "Parameter"
-    properties = [Property('value')]
+    properties = [Property('value'), RichProperty('description', optional=True)]
+
+class DerivedParameterFactory(ParameterFactory):
+    klass = DerivedParameter
+    header = "DerivedParameter"
+    properties = [ExpressionProperty('value'), RichProperty('description', optional=True)]
+
 
 class Matrix():
     def __init__(self, name, matrix) -> None:
@@ -274,16 +299,14 @@ class Syntax():
     family_enumerator = '#'
 
 class Parser():
-    factories = [SpeciesFactory, FamilyFactory, ReactionFactory, ParameterFactory, MatrixFactory]
+    model_factories = [SpeciesFactory, FamilyFactory, ReactionFactory]
+    parameter_factories = [ParameterFactory, MatrixFactory, DerivedParameterFactory]
 
-    def __init__(self, syntax=Syntax(), factories=None) -> None:
+    def __init__(self, syntax=Syntax()) -> None:
         self.syntax = syntax
         self.position_pattern = re.compile(f'^( +)?(.*?)([{re.escape(syntax.period_equivalent)}{re.escape(syntax.colon_equivalent)}])?$')
         self.header_pattern = re.compile(f'^([a-zA-Z]+) ([a-zA-Z0-9_\-> \+{re.escape(syntax.family_denoter)}]+)$')
         self.family_pattern = re.compile(f'{syntax.family_denoter}([a-zA-Z]+)')
-        if factories:
-            self.factories = factories
-        self.factory_lookup = {d.header: d for d in self.factories}
 
     def localize_properties_with_family_members(self, atom_properties, family_names, member_choices, idx):
         # member choices == list of ordered pairs (family name, which member)
@@ -318,21 +341,50 @@ class Parser():
         return existing_atoms
 
     def construct_atom(self, atoms, factory, atom_name, atom_properties):
-        new_atom_properties = {}
-        for property_name, property in atom_properties.items():
-            new_atom_properties[property_name] = property.handle_macros_before_construction(self.syntax)
         if atoms.get(atom_name, None) is not None:
             raise DuplicateAtomNameError(f"Duplicate atom name {atom_name}.")
         return factory.construct(atom_name, atom_properties, atoms)
 
-    def parse_file(self, file):
+    def load_model(self, file, **kwargs):
+        atoms = self.parse_file(file, available_factories=self.model_factories)
+        species = [s for s in atoms.values() if isinstance(s, Species)]
+        reactions = [r for r in atoms.values() if (isinstance(r, Reaction) or isinstance(r, ReactionRateFamily))]
+
+        model = Model(species, reactions, **kwargs)
+
+        return model
+
+    def load_parameters(self, file):
+        parameters = self.parse_file(file, available_factories=self.parameter_factories)
+        straightforward_dictionary = {}
+        for name, p in parameters.items():
+            if isinstance(p, Parameter):
+                if isinstance(p, DerivedParameter):
+                    p.evaluate(straightforward_dictionary)
+                straightforward_dictionary[name] = p.value
+            elif isinstance(p, Matrix):
+                straightforward_dictionary[name] = p.matrix
+        return straightforward_dictionary
+
+    def parse_file(self, file, available_factories=None):
+        if available_factories is None:
+            if '.model' in file:
+                available_factories = self.model_factories
+            elif '.parameters' in file:
+                available_factories = self.parameter_factories
+            else:
+                available_factories = self.model_factories
+        old_dir = os.getcwd()
         path = os.path.abspath(file)
         os.chdir(os.path.dirname(path))
         with open(path, 'r') as f:
             raw = f.readlines()
-        return self.parse_lines(raw)
+        parsed = self.parse_lines(raw, available_factories)
+        os.chdir(old_dir)
+        return parsed
 
-    def parse_lines(self, lines):
+    def parse_lines(self, lines, available_factories):
+        factory_lookup = {f.header: f for f in available_factories}
         expect_header = True
         expect_blank = False
 
@@ -354,6 +406,9 @@ class Parser():
                 # check if indent is acceptable
                 if indent and expect_header:
                     raise ModelSyntaxError(f"Unexpected indent.")
+                
+                if expect_header and terminator != self.syntax.colon_equivalent:
+                    raise ModelSyntaxError(f"Introduction of new item didn't end in colon or period.")
 
                 # if blank line, verify that is acceptable and then pipe all previous atom lines together
                 if l==self.syntax.atom_separator:
@@ -377,7 +432,7 @@ class Parser():
                     atom_header = match[1]
                     atom_name = match[2]
                     try:
-                        atom_factory = self.factory_lookup[atom_header]
+                        atom_factory = factory_lookup[atom_header]
                     except KeyError:
                         raise ModelSyntaxError(f"No means to create {atom_header} (no factory).")
                     expect_header = False
@@ -422,3 +477,15 @@ if __name__ == '__main__':
     atoms = p.parse_file(sys.argv[1])
     for name, atom in atoms.items():
         print(atom)
+    
+    for path in sys.argv[1:]:
+        if '.model' in path:
+            m = p.load_model(path)
+            print(m)
+        
+        if '.parameters' in path:
+            parameters = p.load_parameters(path)
+            print(parameters)
+
+    m.bake_k(parameters)
+    print(m.base_k)
