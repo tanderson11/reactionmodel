@@ -1,8 +1,0 @@
-Family i:
-    members: 1,2,3.
-
-Family j:
-    members: x,y,3.
-
-Species C_i_j:
-    description: "carbon 12 at site _i site _j".
