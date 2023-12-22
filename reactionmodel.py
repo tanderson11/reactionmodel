@@ -48,6 +48,8 @@ class Reaction():
             reactants = [reactants]
         if isinstance(products, Species) or isinstance(products, tuple):
             products = [products]
+        assert(isinstance(reactants, list))
+        assert(isinstance(products, list))
         self.reactants = set([(r[0] if isinstance(r, tuple) else r) for r in reactants])
         self.products = set([(p[0] if isinstance(p, tuple) else p) for p in products])
         self.rate_involved_species = []
@@ -142,23 +144,26 @@ class Model():
         if len(species) == 0:
             raise ValueError("species must include at least one species.")
         self.species = species
-        self.reactions = []
+        self.all_reactions = []
+        self.reaction_groups = []
         used_species = set()
         for r in reactions:
             for s in r.used():
                 used_species.add(s)
             if isinstance(r, Reaction):
-                self.reactions.append(r)
+                self.reaction_groups.append(r)
+                self.all_reactions.append(r)
             elif isinstance(r, ReactionRateFamily):
-                self.reactions.extend(r.reactions)
+                self.reaction_groups.append(r)
+                self.all_reactions.extend(r.reactions)
             else:
                 raise TypeError(f"bad type for reaction in model: {type(r)}. Expected Reaction or ReactionRateFamily")
 
         self.n_species = len(self.species)
-        self.n_reactions = len(self.reactions)
+        self.n_reactions = len(self.all_reactions)
 
         self.species_index = {s:i for i,s in enumerate(self.species)}
-        self.reaction_index = {r:i for i,r in enumerate(self.reactions)}
+        self.reaction_index = {r:i for i,r in enumerate(self.all_reactions)}
 
         self.jit = jit
         # If the rate constants are specified in a "lazy" way that depends on receiving a Parameters object in the future,
@@ -175,7 +180,7 @@ class Model():
         k_of_ts = []
         i = 0
         # reactions not self.reactions so we see families
-        for r in self.reactions:
+        for r in self.reaction_groups:
             # in __init__ we guranteed that one of the following is True:
             # isinstance(r, Reaction) or isinstance(r, ReactionRateFamily)
             if isinstance(r, ReactionRateFamily):
@@ -206,14 +211,14 @@ class Model():
         self.base_k = base_k
         self.k_of_ts = k_of_ts
 
-        k_lock = False
-        return k_lock
-
         if self.jit:
             if NO_NUMBA:
                 raise ModuleNotFoundError("""No module named 'numba'. To use jit=True functions, you must install this package with extras. Try `poetry add "reactionmodel[extras]"` or `pip install "reactionmodel[extras]".""")
             # convert families into relevant lists
             self.k_jit = self.kjit_factory(np.array(self.base_k), self.k_of_ts)
+
+        k_lock = False
+        return k_lock
 
     def kjit_factory(self, base_k, k_families):
         # k_jit can't be an ordinary method because we won't be able to have `self` as an argument in nopython
@@ -246,7 +251,7 @@ class Model():
 
     def multiplicity_matrix(self, mult_type):
         matrix = np.zeros((self.n_species, self.n_reactions))
-        for column, reaction in enumerate(self.reactions):
+        for column, reaction in enumerate(self.all_reactions):
             multiplicity_column = np.zeros(self.n_species)
             reaction_info = reaction.multiplicities(mult_type)
             for species, multiplicity in reaction_info.items():
@@ -373,7 +378,7 @@ class Model():
     def pretty(self, hide_absent=True, skip_blanks=True, max_width=120) -> str:
         absentee_value = None if hide_absent else 0
         pretty = ""
-        for reaction in self.reactions:
+        for reaction in self.all_reactions:
             pretty_reaction = f"{reaction.description:.22}" + " " * max(0, 22-len(reaction.description)) + ":"
             pretty_reaction += self.pretty_side(reaction, MultiplicityType.reacants, absentee_value, skip_blanks)
             pretty_reaction += ' --> '
