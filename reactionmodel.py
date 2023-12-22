@@ -199,7 +199,7 @@ class Model():
             elif isinstance(r.k, function) or (self.jit and isinstance(r.k, CPUDispatcher)):
                 k_of_ts.append(RateConstantCluster(r.k, i, i+1))
             else:
-                raise TypeError(f"a reaction's rate constant should be, a float, a string expression (evaluated --> float when given parameters), or function with signature k(t) --> float: {r} had {r.k}")
+                raise TypeError(f"a reaction's rate constant should be, a float, a string expression (evaluated --> float when given parameters), or function with signature k(t) --> float: {r.k}")
 
             i+=1
 
