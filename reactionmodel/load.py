@@ -13,18 +13,26 @@ class SimulationSpecification():
     options: dict
     initial_condition: np.ndarray
 
-def load(path):
-    model = ModelParser().load_model(os.path.join(path, 'model.txt'))
-    parameters = ParameterParser().load_parameters(os.path.join(path, 'parameters.txt'))
-    options = OptionParser().load_options(os.path.join(path, 'config.txt'))
-    initial = InitialConditionParser().load_initial_condition(os.path.join(path, 'initial.txt'), parameters=parameters)
+def load_specification(model_path, params_path, config_path, ic_path):
+    model = ModelParser().load_model(model_path)
+    parameters = ParameterParser().load_parameters(params_path)
+    options = OptionParser().load_options(config_path)
+    initial = InitialConditionParser().load_initial_condition(ic_path, parameters=parameters)
 
     if model.k_lock:
         model.bake_k(parameters=parameters)
-    
+
     initial_condition = model.make_initial_condition(initial)
 
     return SimulationSpecification(model, parameters, options, initial_condition)
+
+def load(path):
+    mpath = os.path.join(path, 'model.txt')
+    ppath = os.path.join(path, 'parameters.txt')
+    cpath = os.path.join(path, 'config.txt')
+    ipath = os.path.join(path, 'initial.txt')
+    
+    return load_specification(mpath, ppath, cpath, ipath)
 
 if __name__ == '__main__':
     import sys
