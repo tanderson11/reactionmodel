@@ -10,6 +10,7 @@ from reactionmodel.parser import Parser, AtomFactory, ListMatch, ListProperty, P
 # Todo:
 ## Reaction family rates
 ## Clarify what a Match object does vs what a Property object does
+## Use dataclasses for the output of ParameterParser and OptionParser?
 
 ## Constraints:
 ### overlapping family names like x and xx might go wild
@@ -173,7 +174,7 @@ class ParameterParser(Parser):
 
 if __name__ == '__main__':
     import sys
-    
+
     for path in sys.argv[1:]:
         if '.model' in path:
             p = ModelParser()

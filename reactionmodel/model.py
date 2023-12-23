@@ -163,6 +163,7 @@ class Model():
         self.n_reactions = len(self.all_reactions)
 
         self.species_index = {s:i for i,s in enumerate(self.species)}
+        self.species_name_index = {s.name:i for i,s in enumerate(self.species)}
         self.reaction_index = {r:i for i,r in enumerate(self.all_reactions)}
 
         self.jit = jit
@@ -386,6 +387,12 @@ class Model():
 
             pretty += pretty_reaction + '\n'
         return pretty
+
+    def make_initial_condition(self, dictionary):
+        x0 = np.zeros(self.n_species)
+        for k,v in dictionary.items():
+            x0[self.species_name_index[k]] = float(v)
+        return x0
 
 class JitNotImplementedError(Exception):
     pass

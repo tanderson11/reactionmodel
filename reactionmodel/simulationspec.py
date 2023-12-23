@@ -1,4 +1,4 @@
-from reactionmodel.parser import Parser, AtomFactory, Property, RichProperty
+from reactionmodel.parser import Parser, AtomFactory, Property, RichProperty, FamilyFactory
 from reactionmodel.msl import ParameterFactory, DerivedParameterFactory
 
 class Option():
@@ -12,13 +12,13 @@ class Option():
     
 class OptionFactory(AtomFactory):
     klass = Option
-    header = "Parameter"
+    header = "Option"
     properties = [Property('value'), RichProperty('description', optional=True)]
 
 class OptionParser(Parser):
     option_factories = [OptionFactory]
 
-    def load_parameters(self, file):
+    def load_options(self, file):
         parameters = self.parse_file(file, self.option_factories)
         straightforward_dictionary = {}
         for name, p in parameters.items():
@@ -33,7 +33,7 @@ class DerviedInitialConditionFactory(DerivedParameterFactory):
     header = 'DerivedInitial'
 
 class InitialConditionParser(Parser):
-    initial_condition_factories = [InitialConditionFactory, DerviedInitialConditionFactory]
+    initial_condition_factories = [FamilyFactory, InitialConditionFactory, DerviedInitialConditionFactory]
 
     def load_initial_condition(self, file, parameters=None):
         # if parameters are supplied, evaluate every pending expression
@@ -47,7 +47,7 @@ class InitialConditionParser(Parser):
                 else:
                     ic.evaluate(parameters)
                     straightforward_dictionary[name] = ic.value
-            else:
+            elif isinstance(ic, InitialConditionFactory.klass):
                 straightforward_dictionary[name] = ic.value
 
         return straightforward_dictionary
