@@ -2,9 +2,9 @@ import os
 from dataclasses import dataclass
 import numpy as np
 
-from simulationspec import OptionParser, InitialConditionParser
-from msl import ModelParser, ParameterParser
-from model import Model
+from reactionmodel.simulationspec import OptionParser, InitialConditionParser
+from reactionmodel.msl import ModelParser, ParameterParser
+from reactionmodel.model import Model
 
 @dataclass(frozen=True)
 class SimulationSpecification():
