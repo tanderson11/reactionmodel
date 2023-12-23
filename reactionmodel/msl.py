@@ -5,7 +5,7 @@ import pandas as pd
 from dataclasses import dataclass
 from itertools import product
 from simpleeval import simple_eval
-from reactionmodel import ReactionRateFamily, Species, Reaction, Model
+from model import ReactionRateFamily, Species, Reaction, Model
 
 # model specification language
 
