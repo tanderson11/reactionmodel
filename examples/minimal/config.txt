@@ -1,0 +1,5 @@
+Option simulator:
+    value: gillespie.
+
+Option whatever:
+    value: True.

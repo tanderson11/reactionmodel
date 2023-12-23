@@ -1,0 +1,5 @@
+Family i:
+    members: 1,2,3.
+
+Initial X_i:
+    value: 0.5.
