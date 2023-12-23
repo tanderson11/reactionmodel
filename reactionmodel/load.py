@@ -31,7 +31,7 @@ def load(path):
     ppath = os.path.join(path, 'parameters.txt')
     cpath = os.path.join(path, 'config.txt')
     ipath = os.path.join(path, 'initial.txt')
-    
+
     return load_specification(mpath, ppath, cpath, ipath)
 
 if __name__ == '__main__':
