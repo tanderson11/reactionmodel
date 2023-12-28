@@ -4,7 +4,7 @@ from reactionmodel.model import Model
 
 @dataclass(frozen=True)
 class SimulationSpecification():
-    model: Model = None
-    parameters: dict = {}
-    initial_condition: np.ndarray = np.array([])
-    simulation_options: dict = {}
+    model: Model
+    parameters: dict
+    initial_condition: np.ndarray
+    simulation_options: dict
