@@ -1,17 +1,8 @@
 import os
-from dataclasses import dataclass
-import numpy as np
 
 from reactionmodel.simulationspec import OptionParser, InitialConditionParser
 from reactionmodel.msl import ModelParser, ParameterParser
-from reactionmodel.model import Model
-
-@dataclass(frozen=True)
-class SimulationSpecification():
-    model: Model
-    parameters: dict
-    options: dict
-    initial_condition: np.ndarray
+from reactionmodel.specification import SimulationSpecification
 
 def load_specification(model_path, params_path, config_path, ic_path):
     model = ModelParser().load_model(model_path)
@@ -24,7 +15,7 @@ def load_specification(model_path, params_path, config_path, ic_path):
 
     initial_condition = model.make_initial_condition(initial)
 
-    return SimulationSpecification(model, parameters, options, initial_condition)
+    return SimulationSpecification(model, parameters, initial_condition, options)
 
 def load(path):
     mpath = os.path.join(path, 'model.txt')

@@ -3,7 +3,7 @@ from enum import Enum
 from typing import NamedTuple
 from types import FunctionType as function
 from simpleeval import simple_eval
-from dataclasses import dataclass, asdict
+from dataclasses import asdict
 
 NO_NUMBA = False
 try:
