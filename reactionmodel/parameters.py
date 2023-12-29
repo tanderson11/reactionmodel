@@ -1,5 +1,6 @@
-from dataclasses import dataclass, make_dataclass
+from dataclasses import dataclass
 import numpy as np
+from reactionmodel.util import FrozenDictionary
 
 @dataclass(frozen=True)
 class ImmutableArray():
@@ -9,15 +10,15 @@ class ImmutableArray():
     @classmethod
     def from_np_array(cls, np_array) -> None:
         return cls(tuple(np_array.flatten().tolist()), np_array.shape)
-    
+
     def to_np_array(self):
         return np.reshape(np.array(self.data), self.shape)
 
 @dataclass(frozen=True)
-class Parametrization():
-    pass
-    
-    def todict(self):
+class Parametrization(FrozenDictionary):
+    subclass_name = 'SpecifiedParameters'
+
+    def asdict(self):
         d = {}
         for k,v in self.__dict__.items():
             if isinstance(v, ImmutableArray):
@@ -26,17 +27,9 @@ class Parametrization():
                 d[k] = v
         return d
 
-def make_parametrization(parameters):
-    fields = []
-    typed_parameters = {}
-
-    for k,v in parameters.items():
+    @staticmethod
+    def handle_field(k, v):
         if isinstance(v, np.ndarray):
-            fields.append((k, ImmutableArray))
-            typed_parameters[k] = ImmutableArray.from_np_array(v)
+            return (ImmutableArray, ImmutableArray.from_np_array(v))
         else:
-            fields.append((k, float))
-            typed_parameters[k] = float(v)
-        
-    klass = make_dataclass('ModelParametrization', fields, bases=(Parametrization,), frozen=True)
-    return klass(**typed_parameters)
+            return (FloatingPointError, float(v))

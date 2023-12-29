@@ -63,7 +63,7 @@ class Reaction():
 
     def eval_k_with_parameters(self, parameters):
         if not isinstance(parameters, dict):
-            parameters = parameters.todict()
+            parameters = parameters.asdict()
         k = simple_eval(self.k, names=parameters)
         try:
             k = float(k)

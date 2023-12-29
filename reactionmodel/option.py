@@ -1,5 +1,20 @@
+from dataclasses import dataclass
+
 from reactionmodel.parser import Parser, AtomFactory, Property, RichProperty, FamilyFactory
 from reactionmodel.msl import ParameterFactory, DerivedParameterFactory
+from reactionmodel.util import FrozenDictionary
+
+@dataclass(frozen=True)
+class Configuration(FrozenDictionary):
+    subclass_name = 'SpecifiedOptions'
+
+@dataclass(frozen=True)
+class InitialCondition(FrozenDictionary):
+    subclass_name = 'SpecifiedInitialCondition'
+
+    @staticmethod
+    def handle_field(k, v):
+        return (float, float(v))
 
 class Option():
     def __init__(self, name, value, description='') -> None:
@@ -23,8 +38,7 @@ class OptionParser(Parser):
         straightforward_dictionary = {}
         for name, p in parameters.items():
             straightforward_dictionary[name] = p.value
-
-        return straightforward_dictionary
+        return Configuration.make(straightforward_dictionary)
 
 class InitialConditionFactory(ParameterFactory):
     header = 'Initial'
@@ -33,6 +47,7 @@ class DerviedInitialConditionFactory(DerivedParameterFactory):
     header = 'DerivedInitial'
 
 class InitialConditionParser(Parser):
+    frozen_klass = Configuration
     initial_condition_factories = [FamilyFactory, InitialConditionFactory, DerviedInitialConditionFactory]
 
     def load_initial_condition(self, file, parameters=None):
@@ -49,8 +64,7 @@ class InitialConditionParser(Parser):
                     straightforward_dictionary[name] = ic.value
             elif isinstance(ic, InitialConditionFactory.klass):
                 straightforward_dictionary[name] = ic.value
-
-        return straightforward_dictionary
+        return InitialCondition.make(straightforward_dictionary)
 
     @staticmethod
     def evaluate_initial_condition(initial_condition_dictionary, parameters):
