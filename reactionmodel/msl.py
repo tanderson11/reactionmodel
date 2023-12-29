@@ -4,6 +4,7 @@ import pandas as pd
 from simpleeval import simple_eval
 from reactionmodel.model import ReactionRateFamily, Species, Reaction, Model
 from reactionmodel.parser import Parser, AtomFactory, ListMatch, ListProperty, Property, RichProperty, ExpressionProperty, PathProperty, FamilyFactory
+from reactionmodel.parameters import make_parametrization
 
 # model specification language
 
@@ -100,7 +101,7 @@ class DerivedParameter(Parameter):
         self.name = name
         self.value = value
         self.description = description
-    
+
     def evaluate(self, other_parameters):
         value = simple_eval(self.value, names=other_parameters)
         try:
@@ -170,18 +171,19 @@ class ParameterParser(Parser):
                 straightforward_dictionary[name] = p.value
             elif isinstance(p, Matrix):
                 straightforward_dictionary[name] = p.matrix
-        return straightforward_dictionary
+
+        return make_parametrization(straightforward_dictionary)
 
 if __name__ == '__main__':
     import sys
 
     for path in sys.argv[1:]:
-        if '.model' in path:
+        if 'model' in path:
             p = ModelParser()
             m = p.load_model(path)
             print(m)
-        
-        if '.parameters' in path:
+
+        if 'parameters' in path:
             p = ParameterParser()
             parameters = p.load_parameters(path)
             print(parameters)

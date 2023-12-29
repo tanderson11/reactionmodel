@@ -1,6 +1,6 @@
 import os
 
-from reactionmodel.simulationspec import OptionParser, InitialConditionParser
+from reactionmodel.option import OptionParser, InitialConditionParser
 from reactionmodel.msl import ModelParser, ParameterParser
 from reactionmodel.specification import SimulationSpecification
 
