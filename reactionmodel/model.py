@@ -3,7 +3,8 @@ from enum import Enum
 from typing import NamedTuple
 from types import FunctionType as function
 from simpleeval import simple_eval
-from dataclasses import asdict
+from dataclasses import dataclass, asdict
+from functools import cached_property
 
 NO_NUMBA = False
 try:
@@ -13,10 +14,10 @@ try:
 except ModuleNotFoundError:
     NO_NUMBA = True
 
+@dataclass(frozen=True)
 class Species():
-    def __init__(self, name, description='') -> None:
-        self.name = name
-        self.description = description
+    name: str
+    description: str = ''
 
     def __str__(self):
         return self.name
@@ -24,42 +25,52 @@ class Species():
     def __format__(self, __format_spec: str) -> str:
         return format(str(self), __format_spec)
 
-    def __hash__(self) -> int:
-        return hash((self.name))
-
-    def __repr__(self) -> str:
-        return f"Species(name={self.name}, description={self.description})"
-
 class MultiplicityType(Enum):
     reacants = 'reactants'
     products = 'products'
     stoichiometry = 'stoichiometry'
     rate_involvement = 'rate involvement'
 
+@dataclass(frozen=True)
 class Reaction():
-    def __init__(self, name, reactants, products, description='', rate_involvement=None, k=None, reversible=False) -> None:
-        assert reversible == False, "Reversible reactions are not supported. Create separate forward and back reactions instead."
-        self.name = name
-        self.description = description
+    name: str
+    reactants: tuple[Species]
+    products: tuple[Species]
+    description: str = ''
+    rate_involved: tuple[Species] = None
+    reversible: bool = False
+    k: float = None
 
-        self.k = k
+    def __post_init__(self):
+        if isinstance(self.reactants, Species) or isinstance(self.reactants, tuple):
+            object.__setattr__(self, 'reactants', (self.reactants,))
+        if not isinstance(self.reactants, tuple):
+            object.__setattr__(self, 'reactants', tuple(self.reactants))
+        if isinstance(self.products, Species) or isinstance(self.products, tuple):
+            object.__setattr__(self, 'products', (self.products,))
+        if not isinstance(self.products, tuple):
+            object.__setattr__(self, 'products', tuple(self.products))
+        assert(isinstance(self.reactants, tuple))
+        assert(isinstance(self.products, tuple))
 
-        if isinstance(reactants, Species) or isinstance(reactants, tuple):
-            reactants = [reactants]
-        if isinstance(products, Species) or isinstance(products, tuple):
-            products = [products]
-        assert(isinstance(reactants, list))
-        assert(isinstance(products, list))
-        self.reactants = set([(r[0] if isinstance(r, tuple) else r) for r in reactants])
-        self.products = set([(p[0] if isinstance(p, tuple) else p) for p in products])
-        self.rate_involved_species = []
-        if rate_involvement is not None:
-            self.rate_involved_species = set([(r[0] if isinstance(r, tuple) else r) for r in rate_involvement])
+        if self.rate_involved is None:
+            object.__setattr__(self, 'rate_involved', self.reactants)
+        assert self.reversible == False, "Reversible reactions are not supported. Create separate forward and back reactions instead."
 
-        self.reactant_data = reactants
-        self.product_data = products
 
-        self.rate_involvement = self.reactant_data if rate_involvement is None else rate_involvement
+    @cached_property
+    def reactant_species(self):
+        return set([(r[0] if isinstance(r, tuple) else r) for r in self.reactants])
+
+    @cached_property
+    def product_species(self):
+        return set([(p[0] if isinstance(p, tuple) else p) for p in self.products])
+
+    @cached_property
+    def rate_involved_species(self):
+        if self.rate_involved is None:
+            return set([])
+        return set([(r[0] if isinstance(r, tuple) else r) for r in self.rate_involved])
 
     def eval_k_with_parameters(self, parameters):
         if not isinstance(parameters, dict):
@@ -78,14 +89,14 @@ class Reaction():
         positive_multplicity_data = []
         negative_multiplicity_data = []
         if mult_type == MultiplicityType.reacants:
-            positive_multplicity_data = self.reactant_data
+            positive_multplicity_data = self.reactants
         elif mult_type == MultiplicityType.products:
-            positive_multplicity_data = self.product_data
+            positive_multplicity_data = self.products
         elif mult_type == MultiplicityType.stoichiometry:
-            positive_multplicity_data = self.product_data
-            negative_multiplicity_data = self.reactant_data
+            positive_multplicity_data = self.prodcuts
+            negative_multiplicity_data = self.reactants
         elif mult_type == MultiplicityType.rate_involvement:
-            positive_multplicity_data = self.rate_involvement
+            positive_multplicity_data = self.rate_involved
         else:
             raise ValueError(f"bad value for type of multiplicities to calculate: {mult_type}.")
 
@@ -115,17 +126,16 @@ class Reaction():
         return self.multiplicities(MultiplicityType.rate_involvement)
 
     def used(self):
-        return self.products.union(self.reactants).union(self.rate_involved_species)
+        return self.product_species.union(self.reactant_species).union(self.rate_involved_species)
+
+    def __hash__(self) -> int:
+        return hash(self.name)
 
     def __repr__(self) -> str:
-        return f"Reaction(name={self.name}, description={self.description}, reactants={self.reactant_data}, products={self.product_data}, rate_involvement={self.rate_involvement}, k={self.k})"
+        return f"Reaction(name={self.name}, description={self.description}, reactants={self.reactants}, products={self.products}, rate_involvement={self.rate_involved}, k={self.k})"
 
     def __str__(self) -> str:
-        reactants = [str(r) if isinstance(r, Species) else (str(r[0]), r[1]) for r in self.reactant_data]
-        products  = [str(p) if isinstance(p, Species) else (str(p[0]), p[1]) for p in self.product_data]
-        rate_involvement = [str(s) if isinstance(s, Species) else (str(s[0]), s[1]) for s in self.rate_involvement]
-
-        return f"Reaction: {self.name}, reactants={reactants}, products={products}, rate_involvement={rate_involvement}, k={self.k}"
+        return f"Reaction(name={self.name}, description={self.description}, reactants={self.reactants}, products={self.products}, rate_involvement={self.rate_involved}, k={self.k})"
 
 class RateConstantCluster(NamedTuple):
     k: function
@@ -331,6 +341,8 @@ class Model():
             assert False, "Numba JIT functions may only be acquired if Model was created with jit=True"
 
         jit_calculate_propensities = self.get_jit_propensities_function()
+        N = self.stoichiometry
+
         @jit(nopython=True)
         def jit_dydt(t, y):
             propensities = jit_calculate_propensities(t, y)

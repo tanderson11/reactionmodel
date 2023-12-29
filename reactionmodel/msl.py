@@ -82,10 +82,10 @@ class SpeciesFactory(AtomFactory):
     properties = [RichProperty('description', optional=True)]
 
 class ReactionFactory(AtomFactory):
-    # name, description, reactants, products, rate_involvement=None, k=None, reversible=False
+    # name, description, reactants, products, rate_involved=None, k=None, reversible=False
     klass = Reaction
     header = "Reaction"
-    properties = [SpeciesMultiplicityListProperty('reactants'), SpeciesMultiplicityListProperty('products'), SpeciesMultiplicityListProperty('rate_involvement', optional=True), RichProperty('description', optional=True), ExpressionProperty('k', optional=True)]
+    properties = [SpeciesMultiplicityListProperty('reactants'), SpeciesMultiplicityListProperty('products'), SpeciesMultiplicityListProperty('rate_involved', optional=True), RichProperty('description', optional=True), ExpressionProperty('k', optional=True)]
 
 class Parameter():
     def __init__(self, name, value, description='') -> None:

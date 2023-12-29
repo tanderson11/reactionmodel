@@ -15,7 +15,7 @@ def load_specification(model_path, params_path, config_path, ic_path):
         model.bake_k(parameters=parameters)
 
     initial_condition = ImmutableArray.from_np_array(model.make_initial_condition(initial.asdict()))
-
+    print(model.pretty())
     return SimulationSpecification(model, parameters, initial_condition, options)
 
 def load(path):
