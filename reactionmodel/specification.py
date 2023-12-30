@@ -10,6 +10,11 @@ class SimulationSpecification():
     parameters: dict
     initial_condition: dict
     simulation_options: dict
+    simulator: str = None
+
+
+    def __post_init__(self):
+        self.
 
     def get_frozen(self, parameter_class=None, configuration_class=None):
         parametrization = parameter_class(**self.parameters) if parameter_class is not None else Parametrization.make(self.parameters)
@@ -31,4 +36,5 @@ class FrozenSimulationSpecification():
     model: Model
     parameters: FrozenDictionary
     initial_condition: ImmutableArray
+    simulator: str
     simulation_options: FrozenDictionary
