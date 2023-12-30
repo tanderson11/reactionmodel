@@ -14,7 +14,8 @@ class SimulationSpecification():
 
 
     def __post_init__(self):
-        self.
+        simulator = self.simulation_options.pop('simulator')
+        self.simulator = simulator
 
     def get_frozen(self, parameter_class=None, configuration_class=None):
         parametrization = parameter_class(**self.parameters) if parameter_class is not None else Parametrization.make(self.parameters)
