@@ -28,7 +28,7 @@ class FrozenDictionary():
             fields.append((k, field_type))
             typed_parameters[k] = field_value
             
-        klass = make_dataclass(cls.subclass_name, fields, bases=(cls,), frozen=True)
+        klass = make_dataclass(cls.subclass_name, fields, bases=(cls,), frozen=True, eq=False)
         return klass(**typed_parameters)
 
     @staticmethod
@@ -40,3 +40,6 @@ class FrozenDictionary():
         for k,v in self.__dict__.items():
             d[k] = v
         return d
+
+    def __eq__(self, other: object) -> bool:
+        return self.asdict() == other.asdict()

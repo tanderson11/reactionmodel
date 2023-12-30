@@ -3,7 +3,7 @@ from enum import Enum
 from typing import NamedTuple
 from types import FunctionType as function
 from simpleeval import simple_eval
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from functools import cached_property
 
 NO_NUMBA = False
@@ -185,6 +185,11 @@ class Model():
         for s in self.species:
             if s not in used_species:
                 raise UnusedSpeciesError(f'species {s} is not used in any reactions')
+
+    def __eq__(self, other: object) -> bool:
+        if set(other.all_reactions) != set(self.all_reactions):
+            return False
+        return True
 
     def bake_k(self, parameters=None, jit=False):
         # ReactionRateFamilies allow us to calculate k(t) for a group of reactions all at once

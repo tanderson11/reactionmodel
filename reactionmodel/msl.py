@@ -172,7 +172,7 @@ class ParameterParser(Parser):
             elif isinstance(p, Matrix):
                 straightforward_dictionary[name] = p.matrix
 
-        return Parametrization.make(straightforward_dictionary)
+        return straightforward_dictionary
 
 if __name__ == '__main__':
     import sys
