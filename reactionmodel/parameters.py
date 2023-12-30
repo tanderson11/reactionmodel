@@ -1,27 +1,16 @@
 from dataclasses import dataclass
 import numpy as np
 from reactionmodel.util import FrozenDictionary
+from reactionmodel.util import ImmutableArray
 
-@dataclass(frozen=True)
-class ImmutableArray():
-    data: tuple
-    shape: tuple
-
-    @classmethod
-    def from_np_array(cls, np_array) -> None:
-        return cls(tuple(np_array.flatten().tolist()), np_array.shape)
-
-    def to_np_array(self):
-        return np.reshape(np.array(self.data), self.shape)
-
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class Parametrization(FrozenDictionary):
     subclass_name = 'SpecifiedParameters'
 
-    def asdict(self):
+    def asdict(self, rebuild_arrays=True):
         d = {}
         for k,v in self.__dict__.items():
-            if isinstance(v, ImmutableArray):
+            if rebuild_arrays and isinstance(v, ImmutableArray):
                 d[k] = v.to_np_array()
             else:
                 d[k] = v
@@ -32,4 +21,7 @@ class Parametrization(FrozenDictionary):
         if isinstance(v, np.ndarray):
             return (ImmutableArray, ImmutableArray.from_np_array(v))
         else:
-            return (FloatingPointError, float(v))
+            return (float, float(v))
+
+    def __eq__(self, other: object) -> bool:
+        return self.asdict(rebuild_arrays=False) == other.asdict(rebuild_arrays=False)

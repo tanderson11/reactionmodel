@@ -3,7 +3,6 @@ import os
 from reactionmodel.option import OptionParser, InitialConditionParser
 from reactionmodel.msl import ModelParser, ParameterParser
 from reactionmodel.specification import SimulationSpecification
-from reactionmodel.util import ImmutableArray
 
 def load_specification(model_path, params_path, config_path, ic_path):
     model = ModelParser().load_model(model_path)
@@ -14,9 +13,7 @@ def load_specification(model_path, params_path, config_path, ic_path):
     if model.k_lock:
         model.bake_k(parameters=parameters)
 
-    initial_condition = ImmutableArray.from_np_array(model.make_initial_condition(initial.asdict()))
-    print(model.pretty())
-    return SimulationSpecification(model, parameters, initial_condition, options)
+    return SimulationSpecification(model, parameters, initial, options)
 
 def load(path):
     mpath = os.path.join(path, 'model.txt')
@@ -28,4 +25,6 @@ def load(path):
 
 if __name__ == '__main__':
     import sys
-    print(load(sys.argv[1]))
+    spec = load(sys.argv[1])
+    print(spec)
+    print(spec.get_frozen())
