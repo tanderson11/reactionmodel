@@ -12,7 +12,6 @@ class SimulationSpecification():
     simulation_options: dict
     simulator: str = None
 
-
     def __post_init__(self):
         simulator = self.simulation_options.pop('simulator')
         self.simulator = simulator

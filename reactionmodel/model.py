@@ -187,7 +187,9 @@ class Model():
                 raise UnusedSpeciesError(f'species {s} is not used in any reactions')
 
     def __eq__(self, other: object) -> bool:
-        if set(other.all_reactions) != set(self.all_reactions):
+        if tuple(self.species) != tuple(other.species):
+            return False
+        if set(self.all_reactions) != set(other.all_reactions):
             return False
         return True
 

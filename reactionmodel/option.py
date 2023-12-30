@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from reactionmodel.parser import Parser, AtomFactory, Property, RichProperty, FamilyFactory
-from reactionmodel.msl import ParameterFactory, DerivedParameterFactory
+from reactionmodel.msl import ParameterFactory, DerivedParameterFactory, PathProperty
 from reactionmodel.util import FrozenDictionary
 
 @dataclass(frozen=True, eq=False)
@@ -24,7 +24,12 @@ class Option():
 
     def __repr__(self) -> str:
         return f'Option(name={self.name}, value={self.value}, description={self.description})'
-    
+
+class PathOptionFactory(Option):
+    klass = Option
+    header = "PathOption"
+    properties = [PathProperty('path'), RichProperty('description', optional=True)]
+
 class OptionFactory(AtomFactory):
     klass = Option
     header = "Option"
