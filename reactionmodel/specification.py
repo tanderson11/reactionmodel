@@ -23,7 +23,8 @@ class SimulationSpecification():
             self.model,
             parametrization,
             InitialCondition.make(self.initial_condition),
-            configuration,
+            simulator=self.simulator,
+            simulation_options=configuration,
         )
 
     def __eq__(self, __value: object) -> bool:

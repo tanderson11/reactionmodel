@@ -3,3 +3,6 @@ Option simulator:
 
 Option whatever:
     value: True.
+
+PathOption somepath:
+    path: "./blah.txt".

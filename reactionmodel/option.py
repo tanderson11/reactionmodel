@@ -25,7 +25,7 @@ class Option():
     def __repr__(self) -> str:
         return f'Option(name={self.name}, value={self.value}, description={self.description})'
 
-class PathOptionFactory(Option):
+class PathOptionFactory(AtomFactory):
     klass = Option
     header = "PathOption"
     properties = [PathProperty('path'), RichProperty('description', optional=True)]
