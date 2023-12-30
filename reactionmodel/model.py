@@ -93,7 +93,7 @@ class Reaction():
         elif mult_type == MultiplicityType.products:
             positive_multplicity_data = self.products
         elif mult_type == MultiplicityType.stoichiometry:
-            positive_multplicity_data = self.prodcuts
+            positive_multplicity_data = self.products
             negative_multiplicity_data = self.reactants
         elif mult_type == MultiplicityType.rate_involvement:
             positive_multplicity_data = self.rate_involved
