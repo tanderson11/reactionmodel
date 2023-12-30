@@ -36,7 +36,7 @@ class OptionFactory(AtomFactory):
     properties = [Property('value'), RichProperty('description', optional=True)]
 
 class OptionParser(Parser):
-    option_factories = [OptionFactory]
+    option_factories = [OptionFactory, PathOptionFactory]
 
     def load_options(self, file):
         parameters = self.parse_file(file, self.option_factories)
