@@ -21,7 +21,7 @@ class Parametrization(FrozenDictionary):
         if isinstance(v, np.ndarray):
             return (ImmutableArray, ImmutableArray.from_np_array(v))
         else:
-            return (FloatingPointError, float(v))
+            return (float, float(v))
 
     def __eq__(self, other: object) -> bool:
         return self.asdict(rebuild_arrays=False) == other.asdict(rebuild_arrays=False)

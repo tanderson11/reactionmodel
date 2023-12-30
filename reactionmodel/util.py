@@ -27,7 +27,6 @@ class FrozenDictionary():
             field_type, field_value = cls.handle_field(k, v)
             fields.append((k, field_type))
             typed_parameters[k] = field_value
-            
         klass = make_dataclass(cls.subclass_name, fields, bases=(cls,), frozen=True, eq=False)
         return klass(**typed_parameters)
 

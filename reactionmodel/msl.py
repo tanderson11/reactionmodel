@@ -4,7 +4,6 @@ import pandas as pd
 from simpleeval import simple_eval
 from reactionmodel.model import ReactionRateFamily, Species, Reaction, Model
 from reactionmodel.parser import Parser, AtomFactory, ListMatch, ListProperty, Property, RichProperty, ExpressionProperty, PathProperty, FamilyFactory
-from reactionmodel.parameters import Parametrization
 
 # model specification language
 

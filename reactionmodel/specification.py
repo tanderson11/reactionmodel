@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-import numpy as np
 from reactionmodel.model import Model
 from reactionmodel.option import InitialCondition, Configuration
 from reactionmodel.parameters import Parametrization
@@ -11,13 +10,21 @@ class SimulationSpecification():
     parameters: dict
     initial_condition: dict
     simulation_options: dict
+    simulator: str = None
 
-    def get_frozen(self):
+
+    def __post_init__(self):
+        simulator = self.simulation_options.pop('simulator')
+        self.simulator = simulator
+
+    def get_frozen(self, parameter_class=None, configuration_class=None):
+        parametrization = parameter_class(**self.parameters) if parameter_class is not None else Parametrization.make(self.parameters)
+        configuration   = configuration_class(**self.parameters) if configuration_class is not None else Configuration.make(self.simulation_options)
         return FrozenSimulationSpecification(
             self.model,
-            Parametrization.make(self.parameters),
+            parametrization,
             InitialCondition.make(self.initial_condition),
-            Configuration.make(self.simulation_options)
+            configuration,
         )
 
     def __eq__(self, __value: object) -> bool:
@@ -30,4 +37,5 @@ class FrozenSimulationSpecification():
     model: Model
     parameters: FrozenDictionary
     initial_condition: ImmutableArray
+    simulator: str
     simulation_options: FrozenDictionary
