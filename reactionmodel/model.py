@@ -1,4 +1,6 @@
 import numpy as np
+from scipy.special import binom
+
 from enum import Enum
 from typing import NamedTuple
 from types import FunctionType as function
@@ -236,8 +238,8 @@ class Model():
             # convert families into relevant lists
             self.k_jit = self.kjit_factory(np.array(self.base_k), self.k_of_ts)
 
-        k_lock = False
-        return k_lock
+        self.k_lock = False
+        return self.k_lock
 
     def kjit_factory(self, base_k, k_families):
         # k_jit can't be an ordinary method because we won't be able to have `self` as an argument in nopython
@@ -303,7 +305,8 @@ class Model():
             # with states raised to power of involvement
             # multiplied by rate constants == propensity
             # dimension of y is expanded to make it a column vector
-            return np.prod(np.expand_dims(y, axis=1)**self.rate_involvement(), axis=0) * self.k(t)
+            return np.prod(binom(np.expand_dims(y, axis=1), self.rate_involvement()), axis=0) * self.k(t)
+            #return np.prod(np.expand_dims(y, axis=1)**self.rate_involvement(), axis=0) * self.k(t)
         return calculate_propensities
 
     def get_dydt_function(self):
@@ -329,11 +332,26 @@ class Model():
 
         @jit(nopython=True)
         def jit_calculate_propensities(t, y):
-            # product along column in rate involvement matrix
-            # with states raised to power of involvement
-            # multiplied by rate constants == propensity
-            # dimension of y is expanded to make it a column vector
-            intensity_power = np.expand_dims(y, axis=1)**rate_involvement_matrix
+            # we want to calculate (y_i rate_involvement_ij) (binomial coefficient)
+            # for each species i and each reaction j
+            # sadly, inside a numba C function, we can't avail ourselves of scipy's binom,
+            # so we write this little calculator ourselves
+            intensity_power = np.zeros_like(rate_involvement_matrix)
+            for i in range(0, rate_involvement_matrix.shape[0]):
+                for j in range(0, rate_involvement_matrix.shape[1]):
+                    if y[i] < rate_involvement_matrix[i][j]:
+                        intensity_power[i][j] = 0.0
+                    elif y[i] == rate_involvement_matrix[i][j]:
+                        intensity_power[i][j] = 1.0
+                    else:
+                        intensity = 1.0
+                        for x in range(0, rate_involvement_matrix[i][j]):
+                            intensity *= (y[i] - x) / (x+1)
+                        intensity_power[i][j] = intensity
+
+            # then we take the product down the columns (so product over each reaction)
+            # and multiply that output by the vector of rate constants
+            # to get the propensity of each reaction at time t
             k = self.k_jit(t)
             product_down_columns = np.ones(len(k))
             for i in range(0, len(y)):
