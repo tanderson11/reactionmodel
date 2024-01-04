@@ -187,4 +187,4 @@ if __name__ == '__main__':
             parameters = p.load_parameters(path)
             print(parameters)
 
-    m.bake_k(parameters)
+    m.get_k(parameters=parameters)

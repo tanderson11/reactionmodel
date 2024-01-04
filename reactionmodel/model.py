@@ -147,8 +147,11 @@ class RateConstantCluster(NamedTuple):
 class UnusedSpeciesError(Exception):
     pass
 
+class MissingParametersError(Exception):
+    pass
+
 class Model():
-    def __init__(self, species: list[Species], reactions: list[Reaction], parameters=None, jit=False) -> None:
+    def __init__(self, species: list[Species], reactions: list[Reaction]) -> None:
         if isinstance(reactions, Reaction) or isinstance(reactions, ReactionRateFamily):
             reactions = [reactions]
         if len(reactions) == 0:
@@ -178,12 +181,6 @@ class Model():
         self.species_name_index = {s.name:i for i,s in enumerate(self.species)}
         self.reaction_index = {r:i for i,r in enumerate(self.all_reactions)}
 
-        if not jit:
-            self.k_jit = "Run model.bake_k(parameters=parameters, jit=True) to create a C function for calculation of k."
-        # If the rate constants are specified in a "lazy" way that depends on receiving a Parameters object in the future,
-        # we lock some methods of this class until the rate constants have been "baked" properly
-        self.k_lock = self.bake_k(parameters=parameters, jit=jit)
-
         for s in self.species:
             if s not in used_species:
                 raise UnusedSpeciesError(f'species {s} is not used in any reactions')
@@ -195,17 +192,17 @@ class Model():
             return False
         return True
 
-    def bake_k(self, parameters=None, jit=False):
+    def get_k(self, parameters=None, jit=False):
         # ReactionRateFamilies allow us to calculate k(t) for a group of reactions all at once
         base_k = np.zeros(self.n_reactions)
-        k_of_ts = []
+        k_families = []
         i = 0
         # reactions not self.reactions so we see families
         for r in self.reaction_groups:
             # in __init__ we guranteed that one of the following is True:
             # isinstance(r, Reaction) or isinstance(r, ReactionRateFamily)
             if isinstance(r, ReactionRateFamily):
-                k_of_ts.append(RateConstantCluster(r.k, i, i+len(r.reactions)+1))
+                k_families.append(RateConstantCluster(r.k, i, i+len(r.reactions)+1))
                 i += len(r.reactions)
                 continue
 
@@ -213,35 +210,27 @@ class Model():
             assert(isinstance(r,Reaction))
             if isinstance(r.k, str):
                 if parameters is None:
-                    k_lock =  True
-                    notice = "NOTICE: At least one reaction rate constant was a string, but no parameters were provided to decode it. Calculating k(t) will be disabled until Model.bake_k(parameters=parameters) is run."
-                    print(notice)
-                    if jit:
-                        self.k_jit = notice
-                    return k_lock
+                    raise MissingParametersError("attempted to get k(t) without a parameter dictionary where at least one rate constant was a string that needs a parameter dictionary to be evaluated")
                 base_k[i] = r.eval_k_with_parameters(parameters)
             elif isinstance(r.k, float):
                 base_k[i] = r.k
             elif isinstance(r.k, function) or (jit and isinstance(r.k, CPUDispatcher)):
-                k_of_ts.append(RateConstantCluster(r.k, i, i+1))
+                k_families.append(RateConstantCluster(r.k, i, i+1))
             else:
                 raise TypeError(f"a reaction's rate constant should be, a float, a string expression (evaluated --> float when given parameters), or function with signature k(t) --> float: {r.k}")
 
             i+=1
 
-        self.base_k = base_k
-        self.k_of_ts = k_of_ts
-
         if jit:
             if NO_NUMBA:
                 raise ModuleNotFoundError("""No module named 'numba'. To use jit=True functions, you must install this package with extras. Try `poetry add "reactionmodel[extras]"` or `pip install "reactionmodel[extras]".""")
             # convert families into relevant lists
-            self.k_jit = self.kjit_factory(np.array(self.base_k), self.k_of_ts)
+            k = self._get_k_jit(np.array(base_k), k_families)
+            return k
 
-        self.k_lock = False
-        return self.k_lock
+        return self._get_k(base_k, k_families)
 
-    def kjit_factory(self, base_k, k_families):
+    def _get_k_jit(self, base_k, k_families):
         # k_jit can't be an ordinary method because we won't be able to have `self` as an argument in nopython
         # but needs to close around various properties of self, so we define as a closure using this factory function
 
@@ -253,10 +242,10 @@ class Model():
                 return k
             return k_jit
         # otherwise, we have to apply the familiy function to differently sized blocks
-        k_functions, k_slice_bottoms, k_slice_tops = map(np.array, zip(*self.k_of_ts))
+        k_functions, k_slice_bottoms, k_slice_tops = map(np.array, zip(*k_families))
 
         if len(k_functions) > 1:
-            raise JitNotImplementedError("building a nopython jit for the rate constants isn't supported with more than 1 subcomponent of k having explicit time dependence. Try using a ReactionRateFamily for all reactions and supplying a vectorized k.")
+            raise JitNotImplementedError("building a nopython jit function for the rate constants isn't supported with more than 1 subcomponent of k having explicit time dependence. Try using a ReactionRateFamily for all reactions and supplying a vectorized k.")
 
         # now we have only one subcomponent we have to deal with
         k_function, k_slice_bottom, k_slice_top = k_functions[0], k_slice_bottoms[0], k_slice_tops[0]
@@ -282,15 +271,12 @@ class Model():
 
         return matrix
 
-    def check_k_lock(self):
-        if self.k_lock:
-            raise AttributeError("attempted to evaluate k for a Model before rate constants were evaluated. Try `Model.bake_k(parameters=parameters)` first.")
-
-    def k(self, t):
-        self.check_k_lock()
-        k = self.base_k.copy()
-        for family in self.k_of_ts:
-            k[family.slice_bottom:family.slice_top] = family.k(t)
+    def _get_k(self, base_k, k_families):
+        def k(t):
+            k = base_k.copy()
+            for family in k_families:
+                k[family.slice_bottom:family.slice_top] = family.k(t)
+            return k
         return k
 
     def stoichiometry(self):
@@ -299,18 +285,28 @@ class Model():
     def rate_involvement(self):
         return self.multiplicity_matrix(MultiplicityType.rate_involvement)
 
-    def get_propensities_function(self):
+    def get_propensities_function(self, jit=False, **kwargs):
+        if jit:
+            return self._get_jit_propensities_function(**kwargs)
+        return self._get_propensities_function(**kwargs)
+
+    def _get_propensities_function(self, parameters=None):
+        k_of_t = self.get_k(parameters=parameters, jit=False)
         def calculate_propensities(t, y):
             # product along column in rate involvement matrix
             # with states raised to power of involvement
             # multiplied by rate constants == propensity
             # dimension of y is expanded to make it a column vector
-            return np.prod(binom(np.expand_dims(y, axis=1), self.rate_involvement()), axis=0) * self.k(t)
-            #return np.prod(np.expand_dims(y, axis=1)**self.rate_involvement(), axis=0) * self.k(t)
+            return np.prod(binom(np.expand_dims(y, axis=1), self.rate_involvement()), axis=0) * k_of_t(t)
         return calculate_propensities
 
-    def get_dydt_function(self):
-        calculate_propensities = self.get_propensities_function()
+    def get_dydt_function(self, jit=False, **kwargs):
+        if jit:
+            return self._get_jit_dydt_function(**kwargs)
+        return self._get_dydt_function(**kwargs)
+
+    def _get_dydt_function(self, parameters=None):
+        calculate_propensities = self.get_propensities_function(parameters=parameters)
         N = self.stoichiometry()
         def dydt(t, y):
             propensities = calculate_propensities(t, y)
@@ -322,14 +318,9 @@ class Model():
             return dydt
         return dydt
 
-    def get_jit_propensities_function(self):
-        try:
-            self.k_jit
-        except AttributeError:
-            assert False, "Numba JIT functions may only be acquired if Model was created with jit=True"
-
+    def _get_jit_propensities_function(self, parameters=None):
         rate_involvement_matrix = self.rate_involvement()
-        k_jit = self.k_jit
+        k_jit = self.get_k(parameters=parameters, jit=True)
         @jit(nopython=True)
         def jit_calculate_propensities(t, y):
             # Remember, we want total number of distinct combinations * k === rate.
@@ -360,13 +351,8 @@ class Model():
             return product_down_columns * k
         return jit_calculate_propensities
 
-    def get_jit_dydt_function(self):
-        try:
-            self.k_jit
-        except AttributeError:
-            assert False, "Numba JIT functions may only be acquired if Model was created with jit=True"
-
-        jit_calculate_propensities = self.get_jit_propensities_function()
+    def _get_jit_dydt_function(self, parameters=None):
+        jit_calculate_propensities = self._get_jit_propensities_function(parameters=parameters)
         N = self.stoichiometry
 
         @jit(nopython=True)
@@ -439,6 +425,7 @@ class JitNotImplementedError(Exception):
 class ReactionRateFamily():
     def __init__(self, reactions, k) -> None:
         self.reactions = reactions
+        assert(not isinstance(k, str))
         self.k = k
 
     def used(self):
