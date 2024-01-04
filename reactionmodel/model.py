@@ -329,9 +329,10 @@ class Model():
             assert False, "Numba JIT functions may only be acquired if Model was created with jit=True"
 
         rate_involvement_matrix = self.rate_involvement()
-
+        k_jit = self.k_jit
         @jit(nopython=True)
         def jit_calculate_propensities(t, y):
+            # Remember, we want total number of distinct combinations * k === rate.
             # we want to calculate (y_i rate_involvement_ij) (binomial coefficient)
             # for each species i and each reaction j
             # sadly, inside a numba C function, we can't avail ourselves of scipy's binom,
@@ -352,7 +353,7 @@ class Model():
             # then we take the product down the columns (so product over each reaction)
             # and multiply that output by the vector of rate constants
             # to get the propensity of each reaction at time t
-            k = self.k_jit(t)
+            k = k_jit(t)
             product_down_columns = np.ones(len(k))
             for i in range(0, len(y)):
                 product_down_columns = product_down_columns * intensity_power[i]
