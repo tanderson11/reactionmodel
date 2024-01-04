@@ -10,9 +10,6 @@ def load_specification(model_path, params_path, config_path, ic_path):
     options = OptionParser().load_options(config_path)
     initial = InitialConditionParser().load_initial_condition(ic_path, parameters=parameters)
 
-    if model.k_lock:
-        model.bake_k(parameters=parameters)
-
     return SimulationSpecification(model, parameters, initial, options)
 
 def load(path):
