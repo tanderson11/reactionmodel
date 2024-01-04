@@ -300,24 +300,6 @@ class Model():
             return np.prod(binom(np.expand_dims(y, axis=1), self.rate_involvement()), axis=0) * k_of_t(t)
         return calculate_propensities
 
-    def get_dydt_function(self, jit=False, **kwargs):
-        if jit:
-            return self._get_jit_dydt_function(**kwargs)
-        return self._get_dydt_function(**kwargs)
-
-    def _get_dydt_function(self, parameters=None):
-        calculate_propensities = self.get_propensities_function(parameters=parameters)
-        N = self.stoichiometry()
-        def dydt(t, y):
-            propensities = calculate_propensities(t, y)
-
-            # each propensity feeds back into the stoich matrix to determine
-            # overall rate of change in the state
-            # https://en.wikipedia.org/wiki/Biochemical_systems_equation
-            dydt = N @ propensities
-            return dydt
-        return dydt
-
     def _get_jit_propensities_function(self, parameters=None):
         rate_involvement_matrix = self.rate_involvement()
         k_jit = self.get_k(parameters=parameters, jit=True)
@@ -351,10 +333,27 @@ class Model():
             return product_down_columns * k
         return jit_calculate_propensities
 
+    def get_dydt_function(self, jit=False, **kwargs):
+        if jit:
+            return self._get_jit_dydt_function(**kwargs)
+        return self._get_dydt_function(**kwargs)
+
+    def _get_dydt_function(self, parameters=None):
+        calculate_propensities = self.get_propensities_function(parameters=parameters)
+        N = self.stoichiometry()
+        def dydt(t, y):
+            propensities = calculate_propensities(t, y)
+
+            # each propensity feeds back into the stoich matrix to determine
+            # overall rate of change in the state
+            # https://en.wikipedia.org/wiki/Biochemical_systems_equation
+            dydt = N @ propensities
+            return dydt
+        return dydt
+
     def _get_jit_dydt_function(self, parameters=None):
         jit_calculate_propensities = self._get_jit_propensities_function(parameters=parameters)
         N = self.stoichiometry()
-
         @jit(nopython=True)
         def jit_dydt(t, y):
             propensities = jit_calculate_propensities(t, y)
