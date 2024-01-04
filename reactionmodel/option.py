@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import os
 
 from reactionmodel.parser import Parser, AtomFactory, Property, RichProperty, FamilyFactory
 from reactionmodel.msl import ParameterFactory, DerivedParameterFactory, PathProperty
@@ -25,8 +26,11 @@ class Option():
     def __repr__(self) -> str:
         return f'Option(name={self.name}, value={self.value}, description={self.description})'
 
+class PathOption(Option):
+    pass
+
 class PathOptionFactory(AtomFactory):
-    klass = Option
+    klass = PathOption
     header = "PathOption"
     properties = [PathProperty('path'), RichProperty('description', optional=True)]
 
@@ -42,6 +46,10 @@ class OptionParser(Parser):
         parameters = self.parse_file(file, self.option_factories)
         straightforward_dictionary = {}
         for name, p in parameters.items():
+            print(p)
+            if isinstance(p, PathOption):
+                straightforward_dictionary[name] = os.path.join(os.path.split(file)[0], p.value)
+                continue
             straightforward_dictionary[name] = p.value
         return straightforward_dictionary
 
