@@ -6,6 +6,7 @@ from typing import NamedTuple
 from types import FunctionType as function
 from simpleeval import simple_eval
 from dataclasses import dataclass
+from dataclasses import asdict
 from functools import cached_property
 
 NO_NUMBA = False
@@ -55,10 +56,14 @@ class Reaction():
         assert(isinstance(self.reactants, tuple))
         assert(isinstance(self.products, tuple))
 
+        for reactant in self.reactants:
+            assert(isinstance(reactant, (tuple, Species)))
+        for product in self.products:
+            assert(isinstance(product, (tuple, Species)))
+
         if self.rate_involved is None:
             object.__setattr__(self, 'rate_involved', self.reactants)
         assert self.reversible == False, "Reversible reactions are not supported. Create separate forward and back reactions instead."
-
 
     @cached_property
     def reactant_species(self):
@@ -121,6 +126,30 @@ class Reaction():
 
         return multplicities
 
+    @classmethod
+    def rebuild_multiplicity(cls, existing_species, multiplicity_list):
+        multiplicity_info = []
+        for species_info in multiplicity_list:
+            # we want to put the actual species object into the dict
+            if isinstance(species_info, tuple):
+                species_info, multiplicity = species_info
+                multiplicity_info.append((existing_species[species_info['name']], multiplicity))
+                continue
+            multiplicity_info.append(existing_species[species_info['name']])
+        return multiplicity_info
+
+    @classmethod
+    def from_species_and_dictionary(cls, species, dictionary):
+        reactants = cls.rebuild_multiplicity(existing_species=species, multiplicity_list=dictionary['reactants'])
+        products = cls.rebuild_multiplicity(existing_species=species, multiplicity_list=dictionary['products'])
+        rate_involved = cls.rebuild_multiplicity(existing_species=species, multiplicity_list=dictionary['rate_involved'])
+
+        reaction = dictionary.copy()
+        reaction['products'] = products
+        reaction['reactants'] = reactants
+        reaction['rate_involved'] = rate_involved
+        return cls(**reaction)
+
     def stoichiometry(self):
         return self.multiplicities(MultiplicityType.stoichiometry)
 
@@ -156,6 +185,8 @@ class Model():
             reactions = [reactions]
         if len(reactions) == 0:
             raise ValueError("reactions must include at least one reaction.")
+        if isinstance(species, Species):
+            species = [species]
         if len(species) == 0:
             raise ValueError("species must include at least one species.")
         self.species = species
@@ -184,6 +215,32 @@ class Model():
         for s in self.species:
             if s not in used_species:
                 raise UnusedSpeciesError(f'species {s} is not used in any reactions')
+
+    def to_dict(self):
+        return {'species': [asdict(s) for s in self.species], 'reaction_groups': [asdict(r) if isinstance(r, Reaction) else r.to_dict() for r in self.reaction_groups]}
+
+    @classmethod
+    def from_dict(cls, dictionary, functions_by_name={}):
+        dictionary = dictionary.copy()
+        species = {}
+        for species_dict in dictionary.pop('species'):
+            s = Species(**species_dict)
+            species[s.name] = s
+
+        reactions = []
+        for reaction_dict in dictionary.pop('reaction_groups'):
+            # is it a ReactionRateFamily?
+            if 'reactions' in reaction_dict.keys():
+                try:
+                    reactions.append(ReactionRateFamily.from_stringy_species_reactions_k(species, reaction_dict['reactions'], functions_by_name[reaction_dict['k']]))
+                except KeyError:
+                    raise KeyError(f'failed to find function with name {reaction_dict["k"]} when loading a Model that has a ReactionRateFamily. Did you a pass the keyword argument functions_by_name?')
+                continue
+            reactions.append(Reaction.from_species_and_dictionary(species, reaction_dict))
+
+        species = [s for s in species.values()]
+        return cls(species, reactions, **dictionary)
+
 
     def __eq__(self, other: object) -> bool:
         if tuple(self.species) != tuple(other.species):
@@ -421,11 +478,10 @@ class Model():
 class JitNotImplementedError(Exception):
     pass
 
+@dataclass(frozen=True)
 class ReactionRateFamily():
-    def __init__(self, reactions, k) -> None:
-        self.reactions = reactions
-        assert(not isinstance(k, str))
-        self.k = k
+    reactions: list[Reaction]
+    k: callable
 
     def used(self):
         used = set()
@@ -433,3 +489,18 @@ class ReactionRateFamily():
             for s in r.used():
                 used.add(s)
         return used
+
+    def to_dict(self):
+        return {'reactions': [asdict(r) for r in self.reactions], 'k': self.k.__name__}
+
+    @classmethod
+    def from_stringy_species_reactions_k(cls, species, reactions, k):
+        self_dict = {}
+        our_reactions = []
+        for r_dict in reactions:
+            our_reactions.append(Reaction.from_species_and_dictionary(species, r_dict))
+
+        self_dict['reactions'] = our_reactions
+        self_dict['k'] = k
+
+        return cls(**self_dict)

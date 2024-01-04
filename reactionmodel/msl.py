@@ -59,7 +59,7 @@ class SpeciesMultiplicityListProperty(ListProperty):
         species_multiplicity_list = []
         for species_string in property_match.value:
             if species_string == syntax.null_set:
-                assert(len(property_match.value) == 1, "Null set signifier found in a list with more than 1 element.")
+                assert(len(property_match.value) == 1), "Null set signifier found in a list with more than 1 element."
                 species_multiplicity_list = []
                 break
             species_match = re.match(self.species_pattern, species_string)
