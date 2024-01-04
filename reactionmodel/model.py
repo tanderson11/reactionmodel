@@ -353,7 +353,7 @@ class Model():
 
     def _get_jit_dydt_function(self, parameters=None):
         jit_calculate_propensities = self._get_jit_propensities_function(parameters=parameters)
-        N = self.stoichiometry
+        N = self.stoichiometry()
 
         @jit(nopython=True)
         def jit_dydt(t, y):
