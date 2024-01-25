@@ -4,12 +4,12 @@ Family strain:
 Family infection:
     members: DS,DR.
 
-Species _i_j_k:
+Species $i_$j_$k:
     description: "foobar".
     families: {'i': 'strain', 'j':'strain', 'k':'strain'}.
 
-Reaction death of _i_j_k:
-    reactants: _i_j_k
+Reaction death of $i$j$k:
+    reactants: $i_$j_$k
     products: NULL
     description: "death"
     families: {'i': 'strain', 'j':'strain', 'k':'strain'}.

@@ -19,6 +19,7 @@ from reactionmodel.parser import Parser, AtomFactory, ListMatch, ListProperty, P
 ## Wishlist:
 ### Wait for full evaluation, so some things can be provided later by the user?
 ### Do some processing as macro expansion?
+### Factor out patterns so that they are never duplicated, which makes it nearly impossible to change, say, what can be in a species list
 
 class SpeciesMultiplicityListMatch(ListMatch):
     def localize_value_with_family_members(self, syntax, families, chosen_members, idx):
@@ -44,7 +45,7 @@ class SpeciesMultiplicityListMatch(ListMatch):
 class SpeciesMultiplicityListProperty(ListProperty):
     match_klass = SpeciesMultiplicityListMatch
     species_pattern = re.compile('^([0-9]*)(.*?)$')
-    value_pattern_string = '([a-zA-Z0-9{0}{1}]+)$'
+    value_pattern_string = ListProperty.value_pattern_string.replace('{0}', '{0}{1}')
 
     def inject_syntax(self, syntax):
         return self.value_pattern_string.format(re.escape(syntax.list_delimiter), re.escape(syntax.family_denoter))

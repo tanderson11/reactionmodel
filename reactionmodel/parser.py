@@ -22,7 +22,7 @@ class Syntax():
     list_delimiter = ','
     colon_equivalent = ':'
     period_equivalent = '.'
-    family_denoter = '_'
+    family_denoter = '$'
     reaction_arrow = '->'
     family_enumerator = '#'
     null_set = 'NULL'
@@ -36,7 +36,7 @@ class PropertyMatch():
     @staticmethod
     def localize_string_with_family_members(string, syntax, families, chosen_members, idx):
         for family_name, member, i in zip(families, chosen_members, idx):
-            string = string.replace(syntax.family_denoter + family_name, syntax.family_denoter + member)
+            string = string.replace(syntax.family_denoter + family_name, member)
             string = string.replace(syntax.family_enumerator + family_name, str(i))
         return string
 
@@ -126,7 +126,7 @@ class UsedFamiliesProperty(DictionaryProperty):
     match_klass = UsedFamiliesMatch
 
 class ListProperty(Property):
-    value_pattern_string = '([a-zA-Z0-9 {0}]+)$'
+    value_pattern_string = '([a-zA-Z0-9_ {0}]+)$'
     match_klass = ListMatch
 
     def inject_syntax(self, syntax):
@@ -194,7 +194,7 @@ class Parser():
         self.syntax = syntax
         self.position_pattern = re.compile(f'^( +)?(.*?)([{re.escape(syntax.period_equivalent)}{re.escape(syntax.colon_equivalent)}])?$')
         self.header_pattern = re.compile(f'^([a-zA-Z]+) ([a-zA-Z0-9_\-> \+{re.escape(syntax.family_denoter)}]+)$')
-        self.family_pattern = re.compile(f'{syntax.family_denoter}([a-zA-Z]+)')
+        self.family_pattern = re.compile(f'{re.escape(syntax.family_denoter)}([a-zA-Z]+)')
 
     def localize_properties_with_family_members(self, atom_properties, family_names, member_choices, idx):
         # member choices == list of ordered pairs (family name, which member)

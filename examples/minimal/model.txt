@@ -15,10 +15,10 @@ Species Y_j:
 Species Catalyst:
     description: "a catalyst".
 
-Reaction X_i + Y_j -> 2Y_j:
+Reaction X_$i + Y_$j -> 2Y_$j:
     families: {'i': 'typeA', 'j': 'typeB'}
-    reactants: X_i,Y_j
-    products: 2Y_j
-    rate_involved: X_i,Y_j,Catalyst
-    description: "Y_j converts X_i to Y_j"
+    reactants: X_$i,Y_$j
+    products: 2Y_$j
+    rate_involved: X_$i,Y_$j,Catalyst
+    description: "Y_$j converts X_$i to Y_$j"
     k: z * Q[#i][#j].
