@@ -1,5 +1,6 @@
 import re
 import os
+import ast
 from itertools import product
 from dataclasses import dataclass
 
@@ -27,9 +28,10 @@ class Syntax():
     null_set = 'NULL'
 
 class PropertyMatch():
-    def __init__(self, property_name, value):
+    def __init__(self, property_name, value, used_in_constructor):
         self.property_name = property_name
         self.value = value
+        self.used_in_constructor = used_in_constructor
 
     @staticmethod
     def localize_string_with_family_members(string, syntax, families, chosen_members, idx):
@@ -43,13 +45,27 @@ class PropertyMatch():
 
     def localize_with_family_members(self, syntax, families, chosen_members, idx):
         value = self.localize_value_with_family_members(syntax, families, chosen_members, idx)
-        return self.__class__(self.property_name, value)
+        return self.__class__(self.property_name, value, self.used_in_constructor)
 
     def evaluate_with_existing_atoms(self, existing_atoms):
         return self.value
 
 class ExpressionMatch(PropertyMatch):
     pass
+
+class DictionaryMatch(PropertyMatch):
+    def localize_value_with_family_members(self, syntax, families, chosen_members, idx):
+        new_value = {
+            self.localize_string_with_family_members(k, syntax, families, chosen_members, idx):self.localize_string_with_family_members(v, syntax, families, chosen_members, idx)
+            for k,v in self.value.items()
+        }
+        return new_value
+
+class UsedFamiliesMatch(DictionaryMatch):
+    def evaluate_with_existing_atoms(self, existing_atoms):
+        #import pdb; pdb.set_trace()
+        evaluated = {k:existing_atoms[v] for k,v in self.value.items()}
+        return evaluated
 
 class ListMatch(PropertyMatch):
     def localize_value_with_family_members(self, syntax, families, chosen_members, idx):
@@ -59,6 +75,7 @@ class ListMatch(PropertyMatch):
 class Property():
     value_pattern_string = '([a-zA-Z0-9\.]+)$'
     match_klass = PropertyMatch
+    used_in_constructor = True
     def __init__(self, name, optional=False, alternative=None) -> None:
         self.name = name
         self.optional = optional
@@ -80,7 +97,7 @@ class Property():
         pattern = self.get_pattern(syntax)
         match = re.match(pattern, line)
         if match is not None:
-            return self.match_klass(match[1], match[2])
+            return self.match_klass(match[1], match[2], self.used_in_constructor)
         return None
 
 class RichProperty(Property):
@@ -93,8 +110,23 @@ class ExpressionProperty(Property):
     value_pattern_string = '(.*)$'
     match_klass = ExpressionMatch
 
+class DictionaryProperty(Property):
+    value_pattern_string = '(.*)$'
+    match_klass = DictionaryMatch
+
+    def parse(self, line, syntax):
+        property_match = super().parse(line, syntax)
+        # parse the dictionary
+        if property_match is not None:
+            property_match.value = ast.literal_eval(property_match.value)
+        return property_match
+
+class UsedFamiliesProperty(DictionaryProperty):
+    used_in_constructor = False
+    match_klass = UsedFamiliesMatch
+
 class ListProperty(Property):
-    value_pattern_string = '([a-zA-Z0-9{0}]+)$'
+    value_pattern_string = '([a-zA-Z0-9 {0}]+)$'
     match_klass = ListMatch
 
     def inject_syntax(self, syntax):
@@ -104,10 +136,9 @@ class ListProperty(Property):
         property_match = super().parse(line, syntax)
         # split the list!
         if property_match is not None:
-            property_match.value = property_match.value.split(syntax.list_delimiter)
-            return property_match
-
-        return None
+            value = property_match.value.strip(' ')
+            property_match.value = value.split(syntax.list_delimiter)
+        return property_match
 
 class AtomFactory():
     klass = None
@@ -128,11 +159,13 @@ class AtomFactory():
                 v = property_matches.pop(p)
             except KeyError:
                 raise MissingRequiredPropertyError(f'{name} is missing {p}.')
-            ps.append(v.evaluate_with_existing_atoms(existing_atoms))
+            if v.used_in_constructor:
+                ps.append(v.evaluate_with_existing_atoms(existing_atoms))
         for p,v in property_matches.items():
             if p not in optional_properties:
                 raise UnexpectedPropertyError(f'{name} had unexpected property {p}.')
-            optional_ps[p] = v.evaluate_with_existing_atoms(existing_atoms)
+            if v.used_in_constructor:
+                optional_ps[p] = v.evaluate_with_existing_atoms(existing_atoms)
 
         return cls.from_properties(name, *ps, **optional_ps)
 
@@ -177,13 +210,29 @@ class Parser():
     def add_atoms(self, existing_atoms, factory, atom_name, atom_properties):
         new_atoms = {}
         if self.syntax.family_denoter in atom_name:
+            #import pdb; pdb.set_trace()
             families = set(re.findall(self.family_pattern, atom_name))
-            family_members = []
+            families = re.findall(self.family_pattern, atom_name)
 
-            for family_name in families:
-                family = existing_atoms.get(family_name, None)
+            used_families_property_name = None
+            for p in factory.properties:
+                if isinstance(p, UsedFamiliesProperty):
+                    used_families_property_name = p.name
+            if used_families_property_name is None:
+                raise ParserSyntaxError(f"atom {atom_name} used the family token {self.syntax.family_denoter} but that atom type doesn't support families.")
+
+            used_families_property = atom_properties.get(used_families_property_name, None)
+            if used_families_property is None:
+                raise ParserSyntaxError(f"atom {atom_name} used the family token {self.syntax.family_denoter} but no {used_families_property_name} property was specified.")
+
+            # teach the used families property about the families that exist in our specification
+            used_families_property = used_families_property.evaluate_with_existing_atoms(existing_atoms)
+
+            family_members = []
+            for f in families:
+                family = used_families_property.get(f, None)
                 if family is None or not(isinstance(family, Family)):
-                    raise ParserSyntaxError(f"looked for family {family_name} but couldn't find its definition.")
+                    raise ParserSyntaxError(f"looked for family {f} but couldn't find its alias in {used_families_property_name}.")
                 # append the *list*, so we can keep our families straight
                 family_members.append(family.members)
             for idx, combination in self.enumerated_product(*family_members):
@@ -192,6 +241,7 @@ class Parser():
                 new_atoms[localized_name] = self.construct_atom(existing_atoms, factory, localized_name, localized_properties)
         else:
             new_atoms[atom_name] = self.construct_atom(existing_atoms, factory, atom_name, atom_properties)
+        #import pdb; pdb.set_trace()
         existing_atoms.update(new_atoms)
         return existing_atoms
 

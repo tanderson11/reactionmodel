@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from simpleeval import simple_eval
 from reactionmodel.model import ReactionRateFamily, Species, Reaction, Model
-from reactionmodel.parser import Parser, AtomFactory, ListMatch, ListProperty, Property, RichProperty, ExpressionProperty, PathProperty, FamilyFactory
+from reactionmodel.parser import Parser, AtomFactory, ListMatch, ListProperty, Property, RichProperty, ExpressionProperty, PathProperty, FamilyFactory, UsedFamiliesProperty
 
 # model specification language
 
@@ -78,13 +78,20 @@ class SpeciesMultiplicityListProperty(ListProperty):
 class SpeciesFactory(AtomFactory):
     klass = Species
     header = "Species"
-    properties = [RichProperty('description', optional=True)]
+    properties = [RichProperty('description', optional=True), UsedFamiliesProperty('families', optional=True)]
 
 class ReactionFactory(AtomFactory):
     # name, description, reactants, products, rate_involved=None, k=None, reversible=False
     klass = Reaction
     header = "Reaction"
-    properties = [SpeciesMultiplicityListProperty('reactants'), SpeciesMultiplicityListProperty('products'), SpeciesMultiplicityListProperty('rate_involved', optional=True), RichProperty('description', optional=True), ExpressionProperty('k', optional=True)]
+    properties = [
+        SpeciesMultiplicityListProperty('reactants'),
+        SpeciesMultiplicityListProperty('products'),
+        SpeciesMultiplicityListProperty('rate_involved', optional=True),
+        RichProperty('description', optional=True),
+        ExpressionProperty('k', optional=True),
+        UsedFamiliesProperty('families', optional=True)
+    ]
 
 class Parameter():
     def __init__(self, name, value, description='') -> None:

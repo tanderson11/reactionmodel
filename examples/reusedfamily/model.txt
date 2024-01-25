@@ -1,0 +1,15 @@
+Family strain:
+    members: DS,DR,C,X.
+
+Family infection:
+    members: DS,DR.
+
+Species _i_j_k:
+    description: "foobar".
+    families: {'i': 'strain', 'j':'strain', 'k':'strain'}.
+
+Reaction death of _i_j_k:
+    reactants: _i_j_k
+    products: NULL
+    description: "death"
+    families: {'i': 'strain', 'j':'strain', 'k':'strain'}.

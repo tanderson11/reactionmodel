@@ -1,19 +1,22 @@
-Family i:
+Family typeA:
     members: 1,2,3.
 
-Family j:
+Family typeB:
     members: a,b,c.
 
 Species X_i:
+    families: {'i': 'typeA'}
     description: "an X_i".
 
 Species Y_j:
+    families: {'i': 'typeB'}
     description: "a Y_j".
 
 Species Catalyst:
     description: "a catalyst".
 
 Reaction X_i + Y_j -> 2Y_j:
+    families: {'i': 'typeA', 'j': 'typeB'}
     reactants: X_i,Y_j
     products: 2Y_j
     rate_involved: X_i,Y_j,Catalyst
