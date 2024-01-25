@@ -126,7 +126,7 @@ class UsedFamiliesProperty(DictionaryProperty):
     match_klass = UsedFamiliesMatch
 
 class ListProperty(Property):
-    value_pattern_string = '([a-zA-Z0-9_ {0}]+)$'
+    value_pattern_string = '([a-zA-Z0-9<>\(\)_ {0}]+)$'
     match_klass = ListMatch
 
     def inject_syntax(self, syntax):
@@ -193,7 +193,7 @@ class Parser():
     def __init__(self, syntax=Syntax()) -> None:
         self.syntax = syntax
         self.position_pattern = re.compile(f'^( +)?(.*?)([{re.escape(syntax.period_equivalent)}{re.escape(syntax.colon_equivalent)}])?$')
-        self.header_pattern = re.compile(f'^([a-zA-Z]+) ([a-zA-Z0-9_\-> \+{re.escape(syntax.family_denoter)}]+)$')
+        self.header_pattern = re.compile(f'^([a-zA-Z]+) ([a-zA-Z0-9_\-><\(\) \+{re.escape(syntax.family_denoter)}]+)$')
         self.family_pattern = re.compile(f'{re.escape(syntax.family_denoter)}([a-zA-Z]+)')
 
     def localize_properties_with_family_members(self, atom_properties, family_names, member_choices, idx):

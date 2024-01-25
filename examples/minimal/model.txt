@@ -4,13 +4,13 @@ Family typeA:
 Family typeB:
     members: a,b,c.
 
-Species X_i:
+Species X_$i:
     families: {'i': 'typeA'}
-    description: "an X_i".
+    description: "an X_$i".
 
-Species Y_j:
+Species Y_$j:
     families: {'i': 'typeB'}
-    description: "a Y_j".
+    description: "a Y_$j".
 
 Species Catalyst:
     description: "a catalyst".
