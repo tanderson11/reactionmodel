@@ -28,6 +28,13 @@ class Species():
     def __format__(self, __format_spec: str) -> str:
         return format(str(self), __format_spec)
 
+    def to_dict(self):
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, dict):
+        return cls(**dict)
+
 class MultiplicityType(Enum):
     reacants = 'reactants'
     products = 'products'
@@ -36,7 +43,6 @@ class MultiplicityType(Enum):
 
 @dataclass(frozen=True)
 class Reaction():
-    name: str
     reactants: tuple[Species]
     products: tuple[Species]
     description: str = ''
@@ -53,7 +59,10 @@ class Reaction():
             object.__setattr__(self, 'products', (self.products,))
         if not isinstance(self.products, tuple):
             object.__setattr__(self, 'products', tuple(self.products))
+        if not isinstance(self.rate_involved, (tuple, type(None))):
+            object.__setattr__(self, 'rate_involved', tuple(self.rate_involved))
         assert(isinstance(self.reactants, tuple))
+        assert(isinstance(self.rate_involved, (tuple, type(None))))
         assert(isinstance(self.products, tuple))
 
         for reactant in self.reactants:
@@ -64,6 +73,9 @@ class Reaction():
         if self.rate_involved is None:
             object.__setattr__(self, 'rate_involved', self.reactants)
         assert self.reversible == False, "Reversible reactions are not supported. Create separate forward and back reactions instead."
+
+    def to_dict(self):
+        return asdict(self)
 
     @cached_property
     def reactant_species(self):
@@ -86,7 +98,7 @@ class Reaction():
         try:
             k = float(k)
         except ValueError:
-            raise ValueError(f"Evaluation of Reaction k defined by the string {self.k} did not produce a float literal (produced {k})")
+            raise ValueError(f"Python evaluation of Reaction k defined by the string {self.k} did not produce a float literal (produced {k})")
         print(f"Evaluating expression: {self.k} => {k}")
         return k
 
@@ -127,22 +139,22 @@ class Reaction():
         return multplicities
 
     @classmethod
-    def rebuild_multiplicity(cls, existing_species, multiplicity_list):
+    def rebuild_multiplicity(cls, species_context, multiplicity_list):
         multiplicity_info = []
         for species_info in multiplicity_list:
             # we want to put the actual species object into the dict
             if isinstance(species_info, tuple):
                 species_info, multiplicity = species_info
-                multiplicity_info.append((existing_species[species_info['name']], multiplicity))
+                multiplicity_info.append((species_context[species_info['name']], multiplicity))
                 continue
-            multiplicity_info.append(existing_species[species_info['name']])
+            multiplicity_info.append(species_context[species_info['name']])
         return multiplicity_info
 
     @classmethod
-    def from_species_and_dictionary(cls, species, dictionary):
-        reactants = cls.rebuild_multiplicity(existing_species=species, multiplicity_list=dictionary['reactants'])
-        products = cls.rebuild_multiplicity(existing_species=species, multiplicity_list=dictionary['products'])
-        rate_involved = cls.rebuild_multiplicity(existing_species=species, multiplicity_list=dictionary['rate_involved'])
+    def from_dict(cls, dictionary, species_context):
+        reactants = cls.rebuild_multiplicity(species_context=species_context, multiplicity_list=dictionary['reactants'])
+        products = cls.rebuild_multiplicity(species_context=species_context, multiplicity_list=dictionary['products'])
+        rate_involved = cls.rebuild_multiplicity(species_context=species_context, multiplicity_list=dictionary['rate_involved'])
 
         reaction = dictionary.copy()
         reaction['products'] = products
@@ -159,14 +171,11 @@ class Reaction():
     def used(self):
         return self.product_species.union(self.reactant_species).union(self.rate_involved_species)
 
-    def __hash__(self) -> int:
-        return hash(self.name)
-
     def __repr__(self) -> str:
-        return f"Reaction(name={self.name}, description={self.description}, reactants={self.reactants}, products={self.products}, rate_involvement={self.rate_involved}, k={self.k})"
+        return f"Reaction(description={self.description}, reactants={self.reactants}, products={self.products}, rate_involvement={self.rate_involved}, k={self.k})"
 
     def __str__(self) -> str:
-        return f"Reaction(name={self.name}, description={self.description}, reactants={self.reactants}, products={self.products}, rate_involvement={self.rate_involved}, k={self.k})"
+        return f"Reaction(description={self.description}, reactants={self.reactants}, products={self.products}, rate_involvement={self.rate_involved}, k={self.k})"
 
 class RateConstantCluster(NamedTuple):
     k: function
@@ -189,6 +198,8 @@ class Model():
             species = [species]
         if len(species) == 0:
             raise ValueError("species must include at least one species.")
+        if len(reactions) != len(set(reactions)):
+            raise ValueError("expected all reactions to be unique")
         self.species = species
         self.all_reactions = []
         self.reaction_groups = []
@@ -217,7 +228,7 @@ class Model():
                 raise UnusedSpeciesError(f'species {s} is not used in any reactions')
 
     def to_dict(self):
-        return {'species': [asdict(s) for s in self.species], 'reaction_groups': [asdict(r) if isinstance(r, Reaction) else r.to_dict() for r in self.reaction_groups]}
+        return {'species': [s.to_dict() for s in self.species], 'reaction_groups': [r.to_dict() for r in self.reaction_groups]}
 
     @classmethod
     def from_dict(cls, dictionary, functions_by_name={}):
@@ -232,13 +243,14 @@ class Model():
             # is it a ReactionRateFamily?
             if 'reactions' in reaction_dict.keys():
                 try:
-                    reactions.append(ReactionRateFamily.from_stringy_species_reactions_k(species, reaction_dict['reactions'], functions_by_name[reaction_dict['k']]))
+                    reactions.append(ReactionRateFamily.from_dict(reaction_dict['reactions'], species, functions_by_name[reaction_dict['k']]))
                 except KeyError:
                     raise KeyError(f'failed to find function with name {reaction_dict["k"]} when loading a Model that has a ReactionRateFamily. Did you a pass the keyword argument functions_by_name?')
                 continue
-            reactions.append(Reaction.from_species_and_dictionary(species, reaction_dict))
+            reactions.append(Reaction.from_dict(reaction_dict, species))
 
         species = [s for s in species.values()]
+        print(reactions)
         return cls(species, reactions, **dictionary)
 
 
@@ -249,32 +261,42 @@ class Model():
             return False
         return True
 
-    def get_k(self, parameters=None, jit=False):
+    def get_k(self, reaction_to_k={}, parameters=None, jit=False):
+        for r in self.reaction_groups:
+            if r.k is not None:
+                assert r not in reaction_to_k.keys(), f"The rate constant for reaction {r} was already defined as {r.k} but it was also supplied as {reaction_to_k[r]} at runtime."
+                # now it's safe to use the presupplied value of k as there is no conflict
+                reaction_to_k[r] = r.k
+
         # ReactionRateFamilies allow us to calculate k(t) for a group of reactions all at once
         base_k = np.zeros(self.n_reactions)
         k_families = []
         i = 0
         # reactions not self.reactions so we see families
         for r in self.reaction_groups:
+            try:
+                k = reaction_to_k[r]
+            except KeyError:
+                raise KeyError(f"for reaction{r}, k was unset and it was also not supplied at runtime in the `reaction_to_k` dictionary.")
             # in __init__ we guranteed that one of the following is True:
             # isinstance(r, Reaction) or isinstance(r, ReactionRateFamily)
             if isinstance(r, ReactionRateFamily):
-                k_families.append(RateConstantCluster(r.k, i, i+len(r.reactions)+1))
+                k_families.append(RateConstantCluster(k, i, i+len(r.reactions)+1))
                 i += len(r.reactions)
                 continue
 
             # Only reachable if isinstance(r, Reaction)
             assert(isinstance(r,Reaction))
-            if isinstance(r.k, str):
+            if isinstance(k, str):
                 if parameters is None:
                     raise MissingParametersError("attempted to get k(t) without a parameter dictionary where at least one rate constant was a string that needs a parameter dictionary to be evaluated")
                 base_k[i] = r.eval_k_with_parameters(parameters)
-            elif isinstance(r.k, float):
-                base_k[i] = r.k
-            elif isinstance(r.k, function) or (jit and isinstance(r.k, CPUDispatcher)):
-                k_families.append(RateConstantCluster(r.k, i, i+1))
+            elif isinstance(k, (int, float)):
+                base_k[i] = float(k)
+            elif isinstance(k, function) or (jit and isinstance(k, CPUDispatcher)):
+                k_families.append(RateConstantCluster(k, i, i+1))
             else:
-                raise TypeError(f"a reaction's rate constant should be, a float, a string expression (evaluated --> float when given parameters), or function with signature k(t) --> float: {r.k}")
+                raise TypeError(f"a reaction's rate constant should be, a float, a string expression (evaluated --> float when given parameters), or function with signature k(t) --> float. Found: {k}")
 
             i+=1
 
@@ -291,13 +313,10 @@ class Model():
         # k_jit can't be an ordinary method because we won't be able to have `self` as an argument in nopython
         # but needs to close around various properties of self, so we define as a closure using this factory function
 
-        # if we have no explicit time dependence, our k function just returns base_k
+        # if we have no explicit time dependence, just return the rate constants
         if len(k_families) == 0:
-            @jit(Array(float64, 1, "C")(float64), nopython=True)
-            def k_jit(t):
-                k = base_k.copy()
-                return k
-            return k_jit
+            return base_k.copy()
+
         # otherwise, we have to apply the familiy function to differently sized blocks
         k_functions, k_slice_bottoms, k_slice_tops = map(np.array, zip(*k_families))
 
@@ -329,6 +348,8 @@ class Model():
         return matrix
 
     def _get_k(self, base_k, k_families):
+        if len(k_families) == 0:
+            return base_k.copy()
         def k(t):
             k = base_k.copy()
             for family in k_families:
@@ -494,11 +515,11 @@ class ReactionRateFamily():
         return {'reactions': [asdict(r) for r in self.reactions], 'k': self.k.__name__}
 
     @classmethod
-    def from_stringy_species_reactions_k(cls, species, reactions, k):
+    def from_dict(cls, reactions, species_context, k):
         self_dict = {}
         our_reactions = []
         for r_dict in reactions:
-            our_reactions.append(Reaction.from_species_and_dictionary(species, r_dict))
+            our_reactions.append(Reaction.from_dict(r_dict, species_context))
 
         self_dict['reactions'] = our_reactions
         self_dict['k'] = k
