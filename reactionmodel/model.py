@@ -228,7 +228,7 @@ class Model():
                 raise UnusedSpeciesError(f'species {s} is not used in any reactions')
 
     def to_dict(self):
-        return {'species': [s.to_dict() for s in self.species], 'reaction_groups': [r.to_dict() for r in self.reaction_groups]}
+        return {'species': [s.to_dict() for s in self.species], 'reactions': [r.to_dict() for r in self.reaction_groups]}
 
     @classmethod
     def from_dict(cls, dictionary, functions_by_name={}):
@@ -239,7 +239,7 @@ class Model():
             species[s.name] = s
 
         reactions = []
-        for reaction_dict in dictionary.pop('reaction_groups'):
+        for reaction_dict in dictionary.pop('reactions'):
             # is it a ReactionRateFamily?
             if 'reactions' in reaction_dict.keys():
                 try:
