@@ -143,18 +143,22 @@ class Reaction():
         multiplicity_info = []
         for species_info in multiplicity_list:
             # we want to put the actual species object into the dict
-            if isinstance(species_info, tuple):
+            if isinstance(species_info, (tuple, list)):
                 species_info, multiplicity = species_info
-                multiplicity_info.append((species_context[species_info['name']], multiplicity))
+                species_name = species_info if isinstance(species_info, str) else species_info['name']
+                multiplicity_info.append((species_context[species_name], multiplicity))
                 continue
-            multiplicity_info.append(species_context[species_info['name']])
+            # in some formats we will see the lists with just an abbreviation/name for species
+            species_name = species_info if isinstance(species_info, str) else species_info['name']
+            multiplicity_info.append(species_context[species_name])
         return multiplicity_info
 
     @classmethod
     def from_dict(cls, dictionary, species_context):
         reactants = cls.rebuild_multiplicity(species_context=species_context, multiplicity_list=dictionary['reactants'])
         products = cls.rebuild_multiplicity(species_context=species_context, multiplicity_list=dictionary['products'])
-        rate_involved = cls.rebuild_multiplicity(species_context=species_context, multiplicity_list=dictionary['rate_involved'])
+        rate_involved_info = dictionary.get('rate_involved', {})
+        rate_involved = cls.rebuild_multiplicity(species_context=species_context, multiplicity_list=rate_involved_info)
 
         reaction = dictionary.copy()
         reaction['products'] = products
