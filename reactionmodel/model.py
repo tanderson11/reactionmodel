@@ -512,8 +512,13 @@ class JitNotImplementedError(Exception):
 
 @dataclass(frozen=True)
 class ReactionRateFamily():
-    reactions: list[Reaction]
+    reactions: tuple[Reaction]
     k: callable
+
+    def __post_init__(self):
+        if isinstance(self.reactions, list):
+            object.__setattr__(self, 'reactions', tuple(self.reactions))
+        assert(isinstance(self.reactions, tuple))
 
     def used(self):
         used = set()
