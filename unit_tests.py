@@ -13,13 +13,14 @@ class LoadModelTestCase(unittest.TestCase):
 
     def test_minimal(self):
         path = './examples/minimal/'
-        A = Species('A')
+        A = Species('A', description="a lengthy description of A")
         B = Species('B')
         C = Species('C')
 
-        r = Reaction([A, B], [C], k=2.0, description="A + B => C (rate constant 2.0)")
+        r1 = Reaction([A, B], [C], k=2.0, description="A + B => C (rate constant 2.0)")
+        r2 = Reaction([C], [], k=0.5, description="C => empty set (rate constant 0.5)")
 
-        m = Model([A,B,C], [r])
+        m = Model([A,B,C], [r1,r2])
 
         self.assertEqual(m, self.load_from_file(path))
     

@@ -6,6 +6,7 @@ families:
 
 species:
 # a different species for every member of the As family
+# the syntax `$i` is replaced by each member of the target family
 - name: 'A_$i'
   used_families: {'i': 'As'}
 # a different species for every member of the Bs family
