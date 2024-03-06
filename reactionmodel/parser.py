@@ -50,7 +50,7 @@ def expand_families(families, atom, syntax=Syntax()):
             family_method = ReactionRateFamilyApplicationMethod(atom.pop('family_method'))
         except KeyError:
             family_method = ReactionRateFamilyApplicationMethod.group
-        
+
         if family_method == ReactionRateFamilyApplicationMethod.group:
             for field, value in atom.items():
                 if field != 'reactions':
@@ -85,7 +85,7 @@ def expand_families(families, atom, syntax=Syntax()):
             new_field = family_replace(used_families, idx, combination, field, syntax=syntax, do_nestings=False)
             new_atom[new_field] = family_replace(used_families, idx, combination, value, syntax=syntax, do_nestings=(field in nested_fields))
         new_atoms.append(new_atom)
-    
+
     return new_atoms
 
 def parse_model(families, species, reactions, syntax=Syntax()):
@@ -103,31 +103,10 @@ def parse_model(families, species, reactions, syntax=Syntax()):
 
 @dataclass
 class ParseResults():
-    model: Model 
+    model: Model
     parameters: dict
     initial_condition: dict
     simulator_config: dict
-
-@dataclass
-class Parameter():
-    name: str
-    value: float
-
-    @classmethod
-    def from_dict(cls, dictionary):
-        dictionary = dictionary.copy()
-
-        path = dictionary.pop('path', None)
-        if path is not None:
-            header = dictionary.pop('header', None)
-            dictionary['value'] = np.array(pd.read_csv(path, header=header))
-
-        try:
-            dictionary['value'] = float(dictionary['value'])
-        except TypeError:
-            pass
-
-        return cls(**dictionary)
 
 def parse_parameters(parameters_dict):
     parameters = {}
@@ -152,7 +131,30 @@ def parse_initial_condition(families, ic_dict, syntax=Syntax()):
     # combine all those entries into single dictionary
     return reduce(lambda x,y: {**x, **y}, all_entries)
 
-def loads(data, syntax=Syntax()):
+class ConfigParser():
+    '''A class for parsing configuration dictionaries/files associated with forward simulators.
+
+    This class is intended to be subclassed in packages that implement forward simulation.'''
+
+    key = 'simulator_config'
+    @classmethod
+    def parse_dictionary(config_dictionary):
+        return config_dictionary
+
+    @classmethod
+    def load(cls, path, format='yaml'):
+        with open(path, 'r') as f:
+            if format == 'yaml':
+                data = yaml.load(f, Loader=Loader)
+            elif format == 'json':
+                data = json.load(f)
+            else:
+                raise ValueError(f"Expected format keyword to be one of 'json' or 'yaml' found {format}")
+        return cls.parse_dictionary(data[cls.key])
+
+def loads(data, syntax=Syntax(), ConfigParser=ConfigParser):
+    used_keys = []
+
     model = None
     parameters = None
     initial_condition = None
@@ -160,20 +162,24 @@ def loads(data, syntax=Syntax()):
 
     families = data.get('families', {})
     if set(['species', 'reactions']).issubset(data.keys()):
+        used_keys.extend(['species', 'reactions'])
         model = parse_model(families, data['species'], data['reactions'], syntax=syntax)
 
     if 'parameters' in data.keys():
+        used_keys.append('parameters')
         parameters = parse_parameters(data['parameters'])
 
     if 'initial_condition' in data.keys():
+        used_keys.append('initial_condition')
         initial_condition = parse_initial_condition(families, data['initial_condition'], syntax=syntax)
 
     if 'simulator_config' in data.keys():
-        simulator_config = data['simulator_config']
+        used_keys.append('simulator_config')
+        simulator_config = ConfigParser.parse_dictionary(data['simulator_config'])
 
     return ParseResults(model, parameters, initial_condition, simulator_config)
 
-def load(path, format='yaml'):
+def load(path, format='yaml', ConfigParser=ConfigParser):
     with open(path, 'r') as f:
         if format == 'yaml':
             data = yaml.load(f, Loader=Loader)
@@ -181,4 +187,4 @@ def load(path, format='yaml'):
             data = json.load(f)
         else:
             raise ValueError(f"Expected format keyword to be one of 'json' or 'yaml' found {format}")
-    return loads(data)
+    return loads(data, ConfigParser=ConfigParser)
