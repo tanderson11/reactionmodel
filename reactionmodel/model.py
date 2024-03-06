@@ -83,7 +83,8 @@ class Reaction():
         for product in self.products:
             assert(isinstance(product, (tuple, Species)))
 
-        if self.rate_involved is None:
+        # None or zero length
+        if not self.rate_involved:
             object.__setattr__(self, 'rate_involved', self.reactants)
         assert self.reversible == False, "Reversible reactions are not supported. Create separate forward and back reactions instead."
 
