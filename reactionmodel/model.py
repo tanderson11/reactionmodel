@@ -270,7 +270,9 @@ class Model():
             return False
         return True
 
-    def get_k(self, reaction_to_k={}, parameters=None, jit=False):
+    def get_k(self, reaction_to_k=None, parameters=None, jit=False):
+        if reaction_to_k is None:
+            reaction_to_k = {}
         for r in self.reaction_groups:
             if r.k is not None:
                 assert r not in reaction_to_k.keys(), f"The rate constant for reaction {r} was already defined as {r.k} but it was also supplied as {reaction_to_k[r]} at runtime."
