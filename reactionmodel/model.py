@@ -59,7 +59,7 @@ class Reaction():
     reactants: tuple[Species]
     products: tuple[Species]
     description: str = ''
-    rate_involved: tuple[Species] = None
+    kinetic_orders: tuple[Species] = None
     reversible: bool = False
     k: float = None
 
@@ -72,10 +72,10 @@ class Reaction():
             object.__setattr__(self, 'products', (self.products,))
         if not isinstance(self.products, tuple):
             object.__setattr__(self, 'products', tuple(self.products))
-        if not isinstance(self.rate_involved, (tuple, type(None))):
-            object.__setattr__(self, 'rate_involved', tuple(self.rate_involved))
+        if not isinstance(self.kinetic_orders, (tuple, type(None))):
+            object.__setattr__(self, 'kinetic_orders', tuple(self.kinetic_orders))
         assert(isinstance(self.reactants, tuple))
-        assert(isinstance(self.rate_involved, (tuple, type(None))))
+        assert(isinstance(self.kinetic_orders, (tuple, type(None))))
         assert(isinstance(self.products, tuple))
 
         for reactant in self.reactants:
@@ -84,8 +84,8 @@ class Reaction():
             assert(isinstance(product, (tuple, Species)))
 
         # None or zero length
-        if not self.rate_involved:
-            object.__setattr__(self, 'rate_involved', self.reactants)
+        if not self.kinetic_orders:
+            object.__setattr__(self, 'kinetic_orders', self.reactants)
         assert self.reversible == False, "Reversible reactions are not supported. Create separate forward and back reactions instead."
 
     def to_dict(self):
@@ -100,10 +100,10 @@ class Reaction():
         return set([(p[0] if isinstance(p, tuple) else p) for p in self.products])
 
     @cached_property
-    def rate_involved_species(self):
-        if self.rate_involved is None:
+    def kinetic_orders_species(self):
+        if self.kinetic_orders is None:
             return set([])
-        return set([(r[0] if isinstance(r, tuple) else r) for r in self.rate_involved])
+        return set([(r[0] if isinstance(r, tuple) else r) for r in self.kinetic_orders])
 
     def eval_k_with_parameters(self, parameters):
         k = eval_expression(self.k, parameters)
@@ -122,7 +122,7 @@ class Reaction():
             positive_multplicity_data = self.products
             negative_multiplicity_data = self.reactants
         elif mult_type == MultiplicityType.kinetic_order:
-            positive_multplicity_data = self.rate_involved
+            positive_multplicity_data = self.kinetic_orders
         else:
             raise ValueError(f"bad value for type of multiplicities to calculate: {mult_type}.")
 
@@ -164,13 +164,13 @@ class Reaction():
     def from_dict(cls, dictionary, species_context):
         reactants = cls.rebuild_multiplicity(species_context=species_context, multiplicity_list=dictionary['reactants'])
         products = cls.rebuild_multiplicity(species_context=species_context, multiplicity_list=dictionary['products'])
-        rate_involved_info = dictionary.get('rate_involved', {})
-        rate_involved = cls.rebuild_multiplicity(species_context=species_context, multiplicity_list=rate_involved_info)
+        kinetic_orders_info = dictionary.get('kinetic_orders', {})
+        kinetic_orders = cls.rebuild_multiplicity(species_context=species_context, multiplicity_list=kinetic_orders_info)
 
         reaction = dictionary.copy()
         reaction['products'] = products
         reaction['reactants'] = reactants
-        reaction['rate_involved'] = rate_involved
+        reaction['kinetic_orders'] = kinetic_orders
         return cls(**reaction)
 
     def stoichiometry(self):
@@ -180,13 +180,13 @@ class Reaction():
         return self.multiplicities(MultiplicityType.kinetic_order)
 
     def used(self):
-        return self.product_species.union(self.reactant_species).union(self.rate_involved_species)
+        return self.product_species.union(self.reactant_species).union(self.kinetic_orders_species)
 
     def __repr__(self) -> str:
-        return f"Reaction(description={self.description}, reactants={self.reactants}, products={self.products}, kinetic_order={self.rate_involved}, k={self.k})"
+        return f"Reaction(description={self.description}, reactants={self.reactants}, products={self.products}, kinetic_order={self.kinetic_orders}, k={self.k})"
 
     def __str__(self) -> str:
-        return f"Reaction(description={self.description}, reactants={self.reactants}, products={self.products}, kinetic_order={self.rate_involved}, k={self.k})"
+        return f"Reaction(description={self.description}, reactants={self.reactants}, products={self.products}, kinetic_order={self.kinetic_orders}, k={self.k})"
 
 class RateConstantCluster(NamedTuple):
     k: function

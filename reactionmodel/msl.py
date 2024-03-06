@@ -82,13 +82,13 @@ class SpeciesFactory(AtomFactory):
     properties = [RichProperty('description', optional=True), UsedFamiliesProperty('families', optional=True)]
 
 class ReactionFactory(AtomFactory):
-    # name, description, reactants, products, rate_involved=None, k=None, reversible=False
+    # name, description, reactants, products, kinetic_orders=None, k=None, reversible=False
     klass = Reaction
     header = "Reaction"
     properties = [
         SpeciesMultiplicityListProperty('reactants'),
         SpeciesMultiplicityListProperty('products'),
-        SpeciesMultiplicityListProperty('rate_involved', optional=True),
+        SpeciesMultiplicityListProperty('kinetic_orders', optional=True),
         RichProperty('description', optional=True),
         ExpressionProperty('k', optional=True),
         UsedFamiliesProperty('families', optional=True)
