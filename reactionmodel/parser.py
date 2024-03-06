@@ -1,17 +1,15 @@
 import yaml
-from yaml import SafeLoader as Loader
 import json
 import numpy as np
 import pandas as pd
-from functools import reduce
 
-from numpy.typing import ArrayLike
+from yaml import SafeLoader as Loader
+from functools import reduce
 from itertools import product
 from enum import Enum
 from dataclasses import dataclass
 
 from reactionmodel.model import Model
-
 
 @dataclass(frozen=True)
 class Syntax():
@@ -65,7 +63,6 @@ def expand_families(families, atom, syntax=Syntax()):
                 r_ = r.copy()
                 r_['used_families'] = used_families
                 new = expand_families(families, r_, syntax)
-                print(new)
                 new_reactions.extend(new)
             new_rrf = atom.copy()
             new_rrf['reactions'] = new_reactions
@@ -83,6 +80,8 @@ def expand_families(families, atom, syntax=Syntax()):
     for idx, combination in enumerated_product(family_members):
         new_atom = {}
         for field, value in atom.items():
+            nested = field in nested_fields
+            if nested: assert isinstance(value, list), f"For nested field {field} found flat data. Did you remember to include [] in specifying a list of length 1?"
             new_field = family_replace(used_families, idx, combination, field, syntax=syntax, do_nestings=False)
             new_atom[new_field] = family_replace(used_families, idx, combination, value, syntax=syntax, do_nestings=(field in nested_fields))
         new_atoms.append(new_atom)
@@ -100,7 +99,6 @@ def parse_model(families, species, reactions, syntax=Syntax()):
         'species'  : all_species,
         'reactions': all_reactions,
     }
-    print(model_dict)
     return Model.from_dict(model_dict)
 
 @dataclass

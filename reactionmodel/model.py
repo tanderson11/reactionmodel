@@ -1,6 +1,6 @@
 import numpy as np
-from scipy.special import binom
 
+from scipy.special import binom
 from enum import Enum
 from typing import NamedTuple
 from types import FunctionType as function
@@ -11,8 +11,7 @@ from functools import cached_property
 
 NO_NUMBA = False
 try:
-    from numba import jit, float64
-    from numba.types import Array
+    from numba import jit
     from numba.core.registry import CPUDispatcher
 except ModuleNotFoundError:
     NO_NUMBA = True
@@ -261,7 +260,6 @@ class Model():
             reactions.append(Reaction.from_dict(reaction_dict, species))
 
         species = [s for s in species.values()]
-        print(reactions)
         return cls(species, reactions, **dictionary)
 
 

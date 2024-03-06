@@ -1,0 +1,12 @@
+families:
+  strain: [X,Y]
+
+species:
+- name: "<$i_$j_$k>"
+  used_families: {i: strain, j: strain, k: strain}
+
+reactions:
+- description: death of <$i_$j_$k>
+  reactants: [<$i_$j_$k>]
+  products: []
+  used_families: {i: strain, j: strain, k: strain}

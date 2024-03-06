@@ -1,0 +1,10 @@
+species:
+- name: A
+- name: B
+- name: C
+
+reactions:
+- description: A + B => C (rate constant 2.0)
+  reactants: [A, B]
+  products: [C]
+  k: 2.0
