@@ -1,0 +1,22 @@
+# families let us write many species and reactions
+# that formulaically involve sets:
+families:
+  As: [x, y, z]
+  Bs: [p, q, r]
+
+species:
+# a different species for every member of the As family
+- name: 'A_$i'
+  used_families: {'i': 'As'}
+# a different species for every member of the Bs family
+- name: 'B_$j'
+  used_families: {'j': 'Bs'}
+
+reactions:
+# a reaction 2A_i => B_j for all combinations of i,j in As x Bs
+- description: 2A_$i => B_$j
+  reactants: [['A_$i', 2]] # 2 A_i
+  products: ['B_$j']
+  # matrix Q is defined in parameters.yaml. `#i` gives the index of member i in the family
+  k: 'Q[#i][#j]' 
+  used_families: {'i': 'As', 'j': 'Bs'}

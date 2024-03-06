@@ -1,0 +1,6 @@
+families:
+  As: [x, y, z]
+
+initial_condition:
+  A_$i: 1.0 * alpha # alpha defined in parameters.yaml
+  used_families: {'i': 'As'}

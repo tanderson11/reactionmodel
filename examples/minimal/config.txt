@@ -1,8 +1,0 @@
-Option simulator:
-    value: gillespie.
-
-Option whatever:
-    value: True.
-
-PathOption somepath:
-    path: "./blah.txt".

@@ -1,0 +1,3 @@
+parameters:
+ alpha: 2.0
+ Q: {'path': './q.csv'} # load a matrix from a csv
