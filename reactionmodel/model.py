@@ -17,6 +17,19 @@ try:
 except ModuleNotFoundError:
     NO_NUMBA = True
 
+def eval_expression(expression, parameters):
+    print(f"Evaluating expression: {expression} =>", end=" ")
+
+    if not isinstance(parameters, dict):
+        parameters = parameters.asdict()
+    evaluated = simple_eval(expression, names=parameters)
+    try:
+        evaluated = float(evaluated)
+    except ValueError:
+        raise ValueError(f"Python evaluation the string {expression} did not produce a float literal (produced {evaluated})")
+    print(evaluated)
+    return evaluated
+
 @dataclass(frozen=True)
 class Species():
     name: str
@@ -39,7 +52,7 @@ class MultiplicityType(Enum):
     reacants = 'reactants'
     products = 'products'
     stoichiometry = 'stoichiometry'
-    rate_involvement = 'rate involvement'
+    kinetic_order = 'kinetic order'
 
 @dataclass(frozen=True)
 class Reaction():
@@ -92,14 +105,7 @@ class Reaction():
         return set([(r[0] if isinstance(r, tuple) else r) for r in self.rate_involved])
 
     def eval_k_with_parameters(self, parameters):
-        if not isinstance(parameters, dict):
-            parameters = parameters.asdict()
-        k = simple_eval(self.k, names=parameters)
-        try:
-            k = float(k)
-        except ValueError:
-            raise ValueError(f"Python evaluation of Reaction k defined by the string {self.k} did not produce a float literal (produced {k})")
-        print(f"Evaluating expression: {self.k} => {k}")
+        k = eval_expression(self.k, parameters)
         return k
 
     def multiplicities(self, mult_type):
@@ -114,7 +120,7 @@ class Reaction():
         elif mult_type == MultiplicityType.stoichiometry:
             positive_multplicity_data = self.products
             negative_multiplicity_data = self.reactants
-        elif mult_type == MultiplicityType.rate_involvement:
+        elif mult_type == MultiplicityType.kinetic_order:
             positive_multplicity_data = self.rate_involved
         else:
             raise ValueError(f"bad value for type of multiplicities to calculate: {mult_type}.")
@@ -169,17 +175,17 @@ class Reaction():
     def stoichiometry(self):
         return self.multiplicities(MultiplicityType.stoichiometry)
 
-    def rate_involvement(self):
-        return self.multiplicities(MultiplicityType.rate_involvement)
+    def kinetic_order(self):
+        return self.multiplicities(MultiplicityType.kinetic_order)
 
     def used(self):
         return self.product_species.union(self.reactant_species).union(self.rate_involved_species)
 
     def __repr__(self) -> str:
-        return f"Reaction(description={self.description}, reactants={self.reactants}, products={self.products}, rate_involvement={self.rate_involved}, k={self.k})"
+        return f"Reaction(description={self.description}, reactants={self.reactants}, products={self.products}, kinetic_order={self.rate_involved}, k={self.k})"
 
     def __str__(self) -> str:
-        return f"Reaction(description={self.description}, reactants={self.reactants}, products={self.products}, rate_involvement={self.rate_involved}, k={self.k})"
+        return f"Reaction(description={self.description}, reactants={self.reactants}, products={self.products}, kinetic_order={self.rate_involved}, k={self.k})"
 
 class RateConstantCluster(NamedTuple):
     k: function
@@ -364,8 +370,8 @@ class Model():
     def stoichiometry(self):
         return self.multiplicity_matrix(MultiplicityType.stoichiometry)
 
-    def rate_involvement(self):
-        return self.multiplicity_matrix(MultiplicityType.rate_involvement)
+    def kinetic_order(self):
+        return self.multiplicity_matrix(MultiplicityType.kinetic_order)
 
     def get_propensities_function(self, jit=False, **kwargs):
         if jit:
@@ -375,33 +381,33 @@ class Model():
     def _get_propensities_function(self, parameters=None):
         k_of_t = self.get_k(parameters=parameters, jit=False)
         def calculate_propensities(t, y):
-            # product along column in rate involvement matrix
+            # product along column in kinetic order matrix
             # with states raised to power of involvement
             # multiplied by rate constants == propensity
             # dimension of y is expanded to make it a column vector
-            return np.prod(binom(np.expand_dims(y, axis=1), self.rate_involvement()), axis=0) * k_of_t(t)
+            return np.prod(binom(np.expand_dims(y, axis=1), self.kinetic_order()), axis=0) * k_of_t(t)
         return calculate_propensities
 
     def _get_jit_propensities_function(self, parameters=None):
-        rate_involvement_matrix = self.rate_involvement()
+        kinetic_order_matrix = self.kinetic_order()
         k_jit = self.get_k(parameters=parameters, jit=True)
         @jit(nopython=True)
         def jit_calculate_propensities(t, y):
             # Remember, we want total number of distinct combinations * k === rate.
-            # we want to calculate (y_i rate_involvement_ij) (binomial coefficient)
+            # we want to calculate (y_i kinetic_order_ij) (binomial coefficient)
             # for each species i and each reaction j
             # sadly, inside a numba C function, we can't avail ourselves of scipy's binom,
             # so we write this little calculator ourselves
-            intensity_power = np.zeros_like(rate_involvement_matrix)
-            for i in range(0, rate_involvement_matrix.shape[0]):
-                for j in range(0, rate_involvement_matrix.shape[1]):
-                    if y[i] < rate_involvement_matrix[i][j]:
+            intensity_power = np.zeros_like(kinetic_order_matrix)
+            for i in range(0, kinetic_order_matrix.shape[0]):
+                for j in range(0, kinetic_order_matrix.shape[1]):
+                    if y[i] < kinetic_order_matrix[i][j]:
                         intensity_power[i][j] = 0.0
-                    elif y[i] == rate_involvement_matrix[i][j]:
+                    elif y[i] == kinetic_order_matrix[i][j]:
                         intensity_power[i][j] = 1.0
                     else:
                         intensity = 1.0
-                        for x in range(0, rate_involvement_matrix[i][j]):
+                        for x in range(0, kinetic_order_matrix[i][j]):
                             intensity *= (y[i] - x) / (x+1)
                         intensity_power[i][j] = intensity
 
@@ -494,9 +500,11 @@ class Model():
             pretty += pretty_reaction + '\n'
         return pretty
 
-    def make_initial_condition(self, dictionary):
+    def make_initial_condition(self, dictionary, parameters={}):
         x0 = np.zeros(self.n_species)
         for k,v in dictionary.items():
+            if isinstance(v, str):
+                v = eval_expression(v, parameters)
             x0[self.species_name_index[k]] = float(v)
         return x0
 
