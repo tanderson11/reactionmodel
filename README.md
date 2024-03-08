@@ -4,7 +4,7 @@ This package makes it easy to specify any physical system that can be written in
 1. you don't have to think about how will you simulate the model while you're specifying it
 2. but when you do go to simulate, the right choices have been made to make it easy
 
-Maybe a sales pitch can be an example:
+Here's an example of specifying a [Lotka-Volterra](https://en.wikipedia.org/wiki/Lotka–Volterra_equations) predator prey model:
 
 ```python
 import scipy.integrate
@@ -38,6 +38,13 @@ plt.plot(result.t, result.y.T)
 ![Solution to our Lotka Volterra equations](examples/lotka.png)
 
 # Installation
+
+If you're already using [Poetry](https://python-poetry.org): run
+```bash
+poetry add git+https://github.com/tanderson11/reactionmodel.git
+```
+
+Otherwise, read on:
 
 You should add `reactionmodel` as a requirement for your Python project and use `reactionmodel` to specify the model of your system while you use the rest of your code to simulate / test / explore the model. The pain free way of doing this is to use [Poetry](https://python-poetry.org) to manage your dependencies. Poetry manages Python "virtual environments" (i.e. isolated containers with different versions of Python and different collections of packages that won't clash with any other container).
 
