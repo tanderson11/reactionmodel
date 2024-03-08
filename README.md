@@ -40,7 +40,7 @@ plt.plot(result.t, result.y.T)
 
 # Installation
 
-If you're already using [Poetry](https://python-poetry.org): run
+If you're already using [Poetry](https://python-poetry.org), run
 ```bash
 poetry add git+https://github.com/tanderson11/reactionmodel.git
 ```
@@ -83,7 +83,7 @@ poetry init
 Add your project's existing dependencies:
 ```bash
 poetry add numpy
-poetry add {whatever}
+poetry add {whateverelse}
 ```
 Finally install your project and all its dependencies in the environment
 ```bash

@@ -1,13 +1,13 @@
-import yaml
 import json
-import numpy as np
-import pandas as pd
-
-from yaml import SafeLoader as Loader
 from functools import reduce
 from itertools import product
 from enum import Enum
 from dataclasses import dataclass
+
+import yaml
+from yaml import SafeLoader as Loader
+import numpy as np
+import pandas as pd
 
 from reactionmodel.model import Model
 
@@ -138,7 +138,7 @@ class ConfigParser():
 
     key = 'simulator_config'
     @classmethod
-    def parse_dictionary(config_dictionary):
+    def parse_dictionary(cls, config_dictionary):
         return config_dictionary
 
     @classmethod

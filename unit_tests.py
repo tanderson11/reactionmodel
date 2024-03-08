@@ -1,8 +1,7 @@
 import unittest
+from itertools import product
 import os
 import numpy as np
-
-from itertools import product
 
 from reactionmodel.model import Species, Model, Reaction
 import reactionmodel.parser as parser
@@ -49,17 +48,17 @@ class LoadModelTestCase(unittest.TestCase):
         m = Model(a_species+b_species, reactions)
 
         self.assertEqual(m, self.load_from_file(path))
-    
+
     def test_double_family(self):
         strains = ['X', 'Y']
         species = []
         for i,j,k in product(strains, strains, strains):
-           species.append(Species(f'<{i}_{j}_{k}>'))
-        
+            species.append(Species(f'<{i}_{j}_{k}>'))
+
         reactions = []
         for s in species:
-           reactions.append(Reaction(reactants=[s], products=[], description=f"death of {s.name}"))
-        
+            reactions.append(Reaction(reactants=[s], products=[], description=f"death of {s.name}"))
+
         m = Model(species, reactions)
 
         path = './examples/double_used_family'

@@ -1,22 +1,26 @@
-import numpy as np
-
-from scipy.special import binom
 from enum import Enum
-from typing import NamedTuple
-from types import FunctionType as function
-from simpleeval import simple_eval
 from dataclasses import dataclass
 from dataclasses import asdict
 from functools import cached_property
 
+from typing import NamedTuple
+from types import FunctionType as function
+
+import numpy as np
+from scipy.special import binom
+from simpleeval import simple_eval
+
+
+
 NO_NUMBA = False
 try:
-    from numba import jit
+    import numba
     from numba.core.registry import CPUDispatcher
 except ModuleNotFoundError:
     NO_NUMBA = True
 
 def eval_expression(expression, parameters):
+    """Evaluate lazily defined parameter as expression in the context of the provided parameters."""
     print(f"Evaluating expression: {expression} =>", end=" ")
 
     if not isinstance(parameters, dict):
@@ -24,13 +28,14 @@ def eval_expression(expression, parameters):
     evaluated = simple_eval(expression, names=parameters)
     try:
         evaluated = float(evaluated)
-    except ValueError:
-        raise ValueError(f"Python evaluation the string {expression} did not produce a float literal (produced {evaluated})")
+    except ValueError as exc:
+        raise ValueError(f"Python evaluation the string {expression} did not produce a float literal (produced {evaluated})") from exc
     print(evaluated)
     return evaluated
 
 @dataclass(frozen=True)
 class Species():
+    """A species (i.e. object) in the physical system."""
     name: str
     description: str = ''
 
@@ -41,13 +46,16 @@ class Species():
         return format(str(self), __format_spec)
 
     def to_dict(self):
+        """Return dictionary representation of self."""
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, dict):
-        return cls(**dict)
+    def from_dict(cls, d):
+        """Create a Species from a dictionary representation."""
+        return cls(**d)
 
 class MultiplicityType(Enum):
+    """A way that a Species could be involved in a Reaction."""
     reacants = 'reactants'
     products = 'products'
     stoichiometry = 'stoichiometry'
@@ -55,6 +63,7 @@ class MultiplicityType(Enum):
 
 @dataclass(frozen=True)
 class Reaction():
+    """A reaction that converts reactants to products."""
     reactants: tuple[Species]
     products: tuple[Species]
     description: str = ''
@@ -85,30 +94,36 @@ class Reaction():
         # None or zero length
         if not self.kinetic_orders:
             object.__setattr__(self, 'kinetic_orders', self.reactants)
-        assert self.reversible == False, "Reversible reactions are not supported. Create separate forward and back reactions instead."
+        assert self.reversible is False, "Reversible reactions are not supported. Create separate forward and back reactions instead."
 
     def to_dict(self):
+        """Return dictionary representation of self."""
         return asdict(self)
 
     @cached_property
     def reactant_species(self):
+        """The set of Species involved as reactants."""
         return set([(r[0] if isinstance(r, tuple) else r) for r in self.reactants])
 
     @cached_property
     def product_species(self):
+        """The set of Species involved as products."""
         return set([(p[0] if isinstance(p, tuple) else p) for p in self.products])
 
     @cached_property
-    def kinetic_orders_species(self):
+    def kinetic_order_species(self):
+        """The set of species involved in the rate law."""
         if self.kinetic_orders is None:
             return set([])
         return set([(r[0] if isinstance(r, tuple) else r) for r in self.kinetic_orders])
 
     def eval_k_with_parameters(self, parameters):
+        """Evaluate lazy rate constant in the context of parameters."""
         k = eval_expression(self.k, parameters)
         return k
 
     def multiplicities(self, mult_type):
+        """Return list of multiplicity of each species in reaction for multiplicity type (e.g. stoichiometry)"""
         multplicities = {}
 
         positive_multplicity_data = []
@@ -146,6 +161,7 @@ class Reaction():
 
     @classmethod
     def rebuild_multiplicity(cls, species_context, multiplicity_list):
+        """When loading a Reaction from strings, replace a species name with the Species in species_context in a multiplicity list."""
         multiplicity_info = []
         for species_info in multiplicity_list:
             # we want to put the actual species object into the dict
@@ -161,10 +177,20 @@ class Reaction():
 
     @classmethod
     def from_dict(cls, dictionary, species_context):
-        reactants = cls.rebuild_multiplicity(species_context=species_context, multiplicity_list=dictionary['reactants'])
-        products = cls.rebuild_multiplicity(species_context=species_context, multiplicity_list=dictionary['products'])
+        """Given dictionary representation of a Reaction and a species_context of Species objects, return a Reaction"""
+        reactants = cls.rebuild_multiplicity(
+            species_context=species_context,
+            multiplicity_list=dictionary['reactants']
+        )
+        products = cls.rebuild_multiplicity(
+            species_context=species_context,
+            multiplicity_list=dictionary['products']
+        )
         kinetic_orders_info = dictionary.get('kinetic_orders', {})
-        kinetic_orders = cls.rebuild_multiplicity(species_context=species_context, multiplicity_list=kinetic_orders_info)
+        kinetic_orders = cls.rebuild_multiplicity(
+            species_context=species_context,
+            multiplicity_list=kinetic_orders_info
+        )
 
         reaction = dictionary.copy()
         reaction['products'] = products
@@ -173,16 +199,19 @@ class Reaction():
         return cls(**reaction)
 
     def stoichiometry(self):
+        """Return the multiplicity of each species in stoichiometry of the reaction."""
         return self.multiplicities(MultiplicityType.stoichiometry)
 
     def kinetic_order(self):
+        """Return the kinetic intensity of each species in the reaction."""
         return self.multiplicities(MultiplicityType.kinetic_order)
 
     def used(self):
-        return self.product_species.union(self.reactant_species).union(self.kinetic_orders_species)
+        """Return the set of all Species involved in some way in this Reaction."""
+        return self.product_species.union(self.reactant_species).union(self.kinetic_order_species)
 
     def __repr__(self) -> str:
-        return f"Reaction(description={self.description}, reactants={self.reactants}, products={self.products}, kinetic_order={self.kinetic_orders}, k={self.k})"
+        return (f"Reaction(description={self.description}, reactants={self.reactants}, products={self.products}, kinetic_order={self.kinetic_orders}, k={self.k})")
 
     def __str__(self) -> str:
         return f"Reaction(description={self.description}, reactants={self.reactants}, products={self.products}, kinetic_order={self.kinetic_orders}, k={self.k})"
@@ -193,10 +222,10 @@ class RateConstantCluster(NamedTuple):
     slice_top: int
 
 class UnusedSpeciesError(Exception):
-    pass
+    """Model was provided a Species that was used in 0 Reactions."""
 
 class MissingParametersError(Exception):
-    pass
+    """A lazy rate constant needed to be used but no parameters were provided for evaluation."""
 
 class Model():
     def __init__(self, species: list[Species], reactions: list[Reaction]) -> None:
@@ -241,7 +270,9 @@ class Model():
         return {'species': [s.to_dict() for s in self.species], 'reactions': [r.to_dict() for r in self.reaction_groups]}
 
     @classmethod
-    def from_dict(cls, dictionary, functions_by_name={}):
+    def from_dict(cls, dictionary, functions_by_name=None):
+        if functions_by_name is None:
+            functions_by_name = {}
         dictionary = dictionary.copy()
         species = {}
         for species_dict in dictionary.pop('species'):
@@ -254,8 +285,8 @@ class Model():
             if 'reactions' in reaction_dict.keys():
                 try:
                     reactions.append(ReactionRateFamily.from_dict(reaction_dict['reactions'], species, functions_by_name[reaction_dict['k']]))
-                except KeyError:
-                    raise KeyError(f'failed to find function with name {reaction_dict["k"]} when loading a Model that has a ReactionRateFamily. Did you a pass the keyword argument functions_by_name?')
+                except KeyError as exc:
+                    raise KeyError(f'failed to find function with name {reaction_dict["k"]} when loading a Model that has a ReactionRateFamily. Did you a pass the keyword argument functions_by_name?') from exc
                 continue
             reactions.append(Reaction.from_dict(reaction_dict, species))
 
@@ -287,8 +318,8 @@ class Model():
         for r in self.reaction_groups:
             try:
                 k = reaction_to_k[r]
-            except KeyError:
-                raise KeyError(f"for reaction{r}, k was unset and it was also not supplied at runtime in the `reaction_to_k` dictionary.")
+            except KeyError as exc:
+                raise KeyError(f"for reaction{r}, k was unset and it was also not supplied at runtime in the `reaction_to_k` dictionary.") from exc
             # in __init__ we guranteed that one of the following is True:
             # isinstance(r, Reaction) or isinstance(r, ReactionRateFamily)
             if isinstance(r, ReactionRateFamily):
@@ -300,7 +331,7 @@ class Model():
             assert(isinstance(r,Reaction))
             if isinstance(k, str):
                 if parameters is None:
-                    raise MissingParametersError("attempted to get k(t) without a parameter dictionary where at least one rate constant was a string that needs a parameter dictionary to be evaluated")
+                    raise MissingParametersError("attempted to get k(t) without a parameter dictionary where at least one rate constant was a lazy expression that needs a parameter dictionary to be evaluated")
                 base_k[i] = r.eval_k_with_parameters(parameters)
             elif isinstance(k, (int, float)):
                 base_k[i] = float(k)
@@ -337,8 +368,7 @@ class Model():
         # now we have only one subcomponent we have to deal with
         k_function, k_slice_bottom, k_slice_top = k_functions[0], k_slice_bottoms[0], k_slice_tops[0]
 
-        #@jit(Array(float64, 1, "C")(float64), nopython=True)
-        @jit(nopython=True)
+        @numba.jit(nopython=True)
         def k_jit(t):
             k = base_k.copy()
             k[k_slice_bottom:k_slice_top] = k_function(t)
@@ -346,7 +376,8 @@ class Model():
 
         return k_jit
 
-    def multiplicity_matrix(self, mult_type):
+    def multiplicity_matrix(self, mult_type: MultiplicityType):
+        """For kind of multiplicity, return a matrix A_ij of multiplicity of Species i in Reaction j."""
         matrix = np.zeros((self.n_species, self.n_reactions))
         for column, reaction in enumerate(self.all_reactions):
             multiplicity_column = np.zeros(self.n_species)
@@ -369,9 +400,15 @@ class Model():
         return k
 
     def stoichiometry(self):
+        """Return stoichiometry matrix N of model.
+        
+        N_ij = stoichiometry of Species i in Reaction j"""
         return self.multiplicity_matrix(MultiplicityType.stoichiometry)
 
     def kinetic_order(self):
+        """Return kinetic intensity matrix X of model.
+        
+        X_ij = kinetic intensity of Species i in Reaction j"""
         return self.multiplicity_matrix(MultiplicityType.kinetic_order)
 
     def get_propensities_function(self, jit=False, **kwargs):
@@ -396,7 +433,7 @@ class Model():
     def _get_jit_propensities_function(self, parameters=None):
         kinetic_order_matrix = self.kinetic_order()
         k_jit = self.get_k(parameters=parameters, jit=True)
-        @jit(nopython=True)
+        @numba.jit(nopython=True)
         def jit_calculate_propensities(t, y):
             # Remember, we want total number of distinct combinations * k === rate.
             # we want to calculate (y_i kinetic_order_ij) (binomial coefficient)
@@ -447,7 +484,7 @@ class Model():
     def _get_jit_dydt_function(self, parameters=None):
         jit_calculate_propensities = self._get_jit_propensities_function(parameters=parameters)
         N = self.stoichiometry()
-        @jit(nopython=True)
+        @numba.jit(nopython=True)
         def jit_dydt(t, y):
             propensities = jit_calculate_propensities(t, y)
 
@@ -459,53 +496,9 @@ class Model():
 
         return jit_dydt
 
-    @staticmethod
-    def pad_equally_until(string, length, tie='left'):
-        missing_length = length - len(string)
-        if tie == 'left':
-            return " " * int(np.ceil(missing_length/2)) + string + " " * int(np.floor(missing_length/2))
-        return " " * int(np.floor(missing_length/2)) + string + " " * int(np.ceil(missing_length/2))
-
-    def pretty_side(self, reaction, side, absentee_value, skip_blanks=False):
-        padded_length = 4
-        reactant_multiplicities = reaction.multiplicities(side)
-        if len(reactant_multiplicities.keys()) == 0:
-            return self.pad_equally_until("0", padded_length)
-
-        prior_species_flag = False
-        pretty_side = ""
-        for i,s in enumerate(self.species):
-            mult = reactant_multiplicities.get(s, absentee_value)
-            if mult is None:
-                species_piece = '' if i==0 or skip_blanks else ' '*2
-                pretty_side += species_piece
-                if not skip_blanks:
-                    pretty_side += " " * padded_length
-                prior_species_flag = False
-                continue
-            if i == 0:
-                species_piece = ''
-            else:
-                species_piece = ' +' if prior_species_flag else ' '*2
-            prior_species_flag = True
-            species_piece += self.pad_equally_until(f"{str(int(mult)) if mult < 10 else '>9':.2}{s}", padded_length)
-            #print(f"piece: |{species_piece}|")
-            pretty_side += species_piece
-        return pretty_side
-
-    def pretty(self, hide_absent=True, skip_blanks=True, max_width=120) -> str:
-        absentee_value = None if hide_absent else 0
-        pretty = ""
-        for reaction in self.all_reactions:
-            pretty_reaction = f"{reaction.description:.22}" + " " * max(0, 22-len(reaction.description)) + ":"
-            pretty_reaction += self.pretty_side(reaction, MultiplicityType.reacants, absentee_value, skip_blanks)
-            pretty_reaction += ' --> '
-            pretty_reaction += self.pretty_side(reaction, MultiplicityType.products, absentee_value, skip_blanks)
-
-            pretty += pretty_reaction + '\n'
-        return pretty
-
-    def make_initial_condition(self, dictionary, parameters={}):
+    def make_initial_condition(self, dictionary, parameters=None):
+        if parameters is None:
+            parameters = {}
         x0 = np.zeros(self.n_species)
         for k,v in dictionary.items():
             if isinstance(v, str):
@@ -514,7 +507,7 @@ class Model():
         return x0
 
 class JitNotImplementedError(Exception):
-    pass
+    """Could not craft numba.jit function because of limitations of numba."""
 
 @dataclass(frozen=True)
 class ReactionRateFamily():

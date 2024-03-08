@@ -20,6 +20,8 @@ numba = "^0.58.1"
 ipython = "^8.17.2"
 jupyter = "^1.0.0"
 matplotlib = "^3.8.3"
+pylint = "^3.1.0"
+ruff = "^0.3.1"
 
 [build-system]
 requires = ["poetry-core"]
