@@ -44,6 +44,7 @@ If you're already using [Poetry](https://python-poetry.org), run
 ```bash
 poetry add git+https://github.com/tanderson11/reactionmodel.git
 ```
+in your project directory.
 
 Otherwise, read on:
 
