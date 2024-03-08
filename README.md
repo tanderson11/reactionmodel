@@ -2,8 +2,9 @@
 
 This package makes it easy to specify any physical system that can be written in terms of reactions that convert reactants to products. What's nice about this solution is that
 1. you don't have to think about how will you simulate the model while you're specifying it
-2. but when you do go to simulate, the right choices have been made to make it easy
+2. but when you do go to simulate, the right choices have been made to make it easy without giving up performance
 
+## Example 1
 Here's an example of specifying a [Lotka-Volterra](https://en.wikipedia.org/wiki/Lotka–Volterra_equations) predator prey model:
 
 ```python
@@ -37,6 +38,30 @@ result = scipy.integrate.solve_ivp(dydt, [0.0, 100.0], y0=[10.0, 10.0])
 plt.plot(result.t, result.y.T)
 ```
 ![Solution to our Lotka Volterra equations](examples/lotka.png)
+
+## Example 2
+As seen above, it's easy to build a model directly in a Python script or notebook. When collaborating, however, it's often better to specify models in standalone files that can be shared and reviewed by non-programmers while still being tracked by version control. `reactionmodel` supports writing and reading Models in `.yaml` and `.json` files.
+
+```python
+from reactionmodel.model import Species, Reaction, Model
+A = Species('A')
+r = Reaction([A], [], description='death', k='gamma')
+m = Model([A], [r])
+
+m.save('model.yaml')
+```
+Now we can examine `model.yaml`:
+```yaml
+reactions:
+- description: death
+  k: gamma
+  products: []
+  reactants:
+  - A
+species:
+- name: A
+```
+
 
 # Installation
 

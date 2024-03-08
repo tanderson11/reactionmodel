@@ -45,7 +45,10 @@ class Species():
 
     def to_dict(self):
         """Return dictionary representation of self."""
-        return asdict(self)
+        selfdict = asdict(self)
+        if not self.description:
+            selfdict.pop('description')
+        return selfdict
 
     @classmethod
     def from_dict(cls, d):
@@ -97,7 +100,17 @@ class Reaction():
 
     def to_dict(self):
         """Return dictionary representation of self."""
-        return asdict(self)
+        selfdict = {}
+        if self.description:
+            selfdict['description'] = self.description
+        selfdict['reactants'] = [r.name for r in self.reactants]
+        selfdict['products'] = [p.name for p in self.products]
+        if self.kinetic_orders != self.reactants:
+            selfdict['kinetic_orders'] = self.kinetic_orders
+        if self.reversible:
+            selfdict['reversible'] = self.reversible
+        selfdict['k'] = self.k
+        return selfdict
 
     @cached_property
     def reactant_species(self):
@@ -320,6 +333,18 @@ class Model():
 
     def to_dict(self):
         return {'species': [s.to_dict() for s in self.species], 'reactions': [r.to_dict() for r in self.reaction_groups]}
+
+    def save(self, filename, format='yaml'):
+        if format=='yaml':
+            import yaml
+            with open(filename, 'w') as f:
+                yaml.dump(self.to_dict(), f, Dumper=yaml.SafeDumper)
+        elif format=='json':
+            import json
+            with open(filename, 'w') as f:
+                json.dump(self.to_dict(), f)
+        else:
+            raise ValueError(f"format should be one of yaml or json was {format}")
 
     @classmethod
     def from_dict(cls, dictionary, functions_by_name=None):
