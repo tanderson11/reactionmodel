@@ -50,7 +50,7 @@ m = Model([A], [r])
 
 m.save('model.yaml')
 ```
-Now we can examine `model.yaml`:
+This produces the file:
 ```yaml
 reactions:
 - description: death
@@ -61,7 +61,7 @@ reactions:
 species:
 - name: A
 ```
-
+In [`examples/`](examples/) you can several systems that show different features of the file specification, including the ability to programatically generate groups of related species and reactions.
 
 # Installation
 

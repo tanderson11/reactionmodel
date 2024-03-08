@@ -671,7 +671,7 @@ class Model():
         return x0
 
 class JitNotImplementedError(Exception):
-    """Could not craft numba.jit function because of limitations of numba."""
+    """Could not craft numba.jit function because of limitations of numba's nopython mode."""
 
 @dataclass(frozen=True)
 class ReactionRateFamily():
