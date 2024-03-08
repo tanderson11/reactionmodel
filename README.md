@@ -7,8 +7,6 @@ This package makes it easy to specify any physical system that can be written in
 Here's an example of specifying a [Lotka-Volterra](https://en.wikipedia.org/wiki/Lotka–Volterra_equations) predator prey model:
 
 ```python
-import scipy.integrate
-import matplotlib.pyplot as plt
 from reactionmodel.model import Species, Model, Reaction
 
 ## Model is specified
@@ -24,6 +22,9 @@ reactions.append(Reaction([predator], [], k="gamma", description="predator death
 m = Model([prey, predator], reactions)
 
 ## Now I want to simulate it
+import scipy.integrate
+import matplotlib.pyplot as plt
+
 parameters = {
     'alpha': 1.1,
     'beta': 0.4,
