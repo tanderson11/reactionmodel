@@ -380,13 +380,17 @@ class Model():
         return self._get_propensities_function(**kwargs)
 
     def _get_propensities_function(self, parameters=None):
-        k_of_t = self.get_k(parameters=parameters, jit=False)
+        k = self.get_k(parameters=parameters, jit=False)
         def calculate_propensities(t, y):
+            if isinstance(k, np.ndarray):
+                k_of_t = k
+            else:
+                k_of_t = k(t)
             # product along column in kinetic order matrix
             # with states raised to power of involvement
             # multiplied by rate constants == propensity
             # dimension of y is expanded to make it a column vector
-            return np.prod(binom(np.expand_dims(y, axis=1), self.kinetic_order()), axis=0) * k_of_t(t)
+            return np.prod(binom(np.expand_dims(y, axis=1), self.kinetic_order()), axis=0) * k_of_t
         return calculate_propensities
 
     def _get_jit_propensities_function(self, parameters=None):
