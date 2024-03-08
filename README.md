@@ -32,7 +32,7 @@ parameters = {
     'gamma': 0.4
 }
 
-dydt = m.get_dydt_function(parameters=parameters)
+dydt = m.get_dydt(parameters=parameters)
 result = scipy.integrate.solve_ivp(dydt, [0.0, 100.0], y0=[10.0, 10.0])
 plt.plot(result.t, result.y.T)
 ```

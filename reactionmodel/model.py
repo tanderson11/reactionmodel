@@ -10,8 +10,6 @@ import numpy as np
 from scipy.special import binom
 from simpleeval import simple_eval
 
-
-
 NO_NUMBA = False
 try:
     import numba
@@ -72,6 +70,7 @@ class Reaction():
     k: float = None
 
     def __post_init__(self):
+        """Ensure everything that should be a tuple is. Add default kinetic orders if unspecified."""
         if isinstance(self.reactants, Species) or isinstance(self.reactants, tuple):
             object.__setattr__(self, 'reactants', (self.reactants,))
         if not isinstance(self.reactants, tuple):
@@ -228,8 +227,59 @@ class MissingParametersError(Exception):
     """A lazy rate constant needed to be used but no parameters were provided for evaluation."""
 
 class Model():
+    """A model of a physical system consisting of Species and Reactions.
+
+    Attributes
+    ----------
+    n_species: int
+        Number of species in model.
+    n_reactions: int
+        Number of reactions in model.
+    species: list[Species]
+        Ordered list of Species in model.
+    all_reactions: list[Reaction]
+        Ordered list of all Reactions in model.
+    reaction_groups: list[Reaction, ReactionRateFamily]
+        Ordered list of all reaction groups, where reactions are grouped together if the
+        evaluation of their time dependent rate constants will be done in vectorized fashion.
+
+    Methods
+    ----------
+    stoichiometry():
+        Return stoichiometry matrix N. N_ij = stoichiometry of Species i in Reaction j.
+    kinetic_order():
+        Return matrix of kinetic orders X. X_ij = intensity of Species i in rate law of Reaction j.
+    get_k(reaction_to_k=None, parameters=None, jit=False)
+        Return a function k(t) that gives the rate constants for reactions at time t.
+    get_dydt(reaction_to_k=None, parameters=None, jit=False)
+        Return a function dydt(t, y) that gives the time derivative of species quantities at time t.
+    """
     def __init__(self, species: list[Species], reactions: list[Reaction]) -> None:
-        if isinstance(reactions, Reaction) or isinstance(reactions, ReactionRateFamily):
+        """Make a model for the given species and reactions.
+
+        Parameters
+        ----------
+        species : list[Species]
+            An ordered list of species. Defines the order of matrix rows.
+        reactions : list[Reaction]
+            An ordered list of reactions. Defines the order of matrix columns.
+
+        Raises
+        ------
+        ValueError
+            If no species are specified.
+        ValueError
+            If no reactions are specified.
+        ValueError
+            If species are not unique.
+        ValueError
+            If reactions are not unique
+        TypeError
+            If each reaction is not either a Reaction or a ReactionRateFamily.
+        UnusedSpeciesError
+            If a given species is not used in any reaction.
+        """
+        if isinstance(reactions, (Reaction,ReactionRateFamily)):
             reactions = [reactions]
         if len(reactions) == 0:
             raise ValueError("reactions must include at least one reaction.")
@@ -237,6 +287,8 @@ class Model():
             species = [species]
         if len(species) == 0:
             raise ValueError("species must include at least one species.")
+        if len(species) != len(set(species)):
+            raise ValueError("expected all species to be unique")
         if len(reactions) != len(set(reactions)):
             raise ValueError("expected all reactions to be unique")
         self.species = species
@@ -301,7 +353,39 @@ class Model():
             return False
         return True
 
-    def get_k(self, reaction_to_k=None, parameters=None, jit=False):
+    def get_k(self, reaction_to_k: dict=None, parameters: dict=None, jit=False):
+        """Return a function k(t) => rate constants of reactions at time t.
+
+        Parameters
+        ----------
+        reaction_to_k : dict, optional
+            A mapping of reaction: k float or k(t) for reactions
+            where k was not already specified, by default None
+        parameters : dict, optional
+            A mapping of parameter_name: value for evaluating lazily defined rate constants,
+            by default None
+        jit : bool, optional
+            If True, use numba.jit(nopython=True) to return low-level callable (i.e. faster)
+            version of k(t), by default False.
+
+        Returns
+        -------
+        Callable or np.ndarray
+            The function k(t) => rate constants of reactions at time t. Returns array of constants
+            if no rate constant has explicit time dependence.
+
+        Raises
+        ------
+        KeyError
+            If a Reaction has k=None and is not provided k in reaction_to_k.
+        MissingParametersError
+            If a Reaction has a lazily defined rate law in terms of parameter that is not
+            given in parameters.
+        TypeError
+            If a Reaction has a rate constant of an invalid type (i.e. not a float or string).
+        ModuleNotFoundError
+            If jit=True but numba is not installed.
+        """
         if reaction_to_k is None:
             reaction_to_k = {}
         for r in self.reaction_groups:
@@ -377,7 +461,7 @@ class Model():
         return k_jit
 
     def multiplicity_matrix(self, mult_type: MultiplicityType):
-        """For kind of multiplicity, return a matrix A_ij of multiplicity of Species i in Reaction j."""
+        """For a kind of multiplicity, return a matrix A_ij of multiplicity of Species i in Reaction j."""
         matrix = np.zeros((self.n_species, self.n_reactions))
         for column, reaction in enumerate(self.all_reactions):
             multiplicity_column = np.zeros(self.n_species)
@@ -401,23 +485,44 @@ class Model():
 
     def stoichiometry(self):
         """Return stoichiometry matrix N of model.
-        
+
         N_ij = stoichiometry of Species i in Reaction j"""
         return self.multiplicity_matrix(MultiplicityType.stoichiometry)
 
     def kinetic_order(self):
         """Return kinetic intensity matrix X of model.
-        
+
         X_ij = kinetic intensity of Species i in Reaction j"""
         return self.multiplicity_matrix(MultiplicityType.kinetic_order)
 
-    def get_propensities_function(self, jit=False, **kwargs):
-        if jit:
-            return self._get_jit_propensities_function(**kwargs)
-        return self._get_propensities_function(**kwargs)
+    def get_propensities_function(self, reaction_to_k: dict=None, parameters: dict=None, jit: bool=False):
+        """Return function a(t, y) that returns the propensity of each reaction at time t given state=y.
 
-    def _get_propensities_function(self, parameters=None):
-        k = self.get_k(parameters=parameters, jit=False)
+        Parameters
+        ----------
+        reaction_to_k : dict, optional
+            A mapping of reaction: k float or k(t) for reactions
+            where k was not already specified, by default None
+        parameters : dict, optional
+            A mapping of parameter_name: value for evaluating lazily defined rate constants,
+            by default None
+        jit : bool, optional
+            If True, use numba.jit(nopython=True) to return low-level callable (i.e. faster)
+            version of k(t), by default False.
+
+        Returns
+        -------
+        Callable
+            A function a(t, y) that returns the propensity of each reaction at time t given state=y.
+            Reaction r's propensity a_r(t, y) is such that in time [t, t+dt) the reaction fires
+            once with probability a_r(t, y).
+        """
+        if jit:
+            return self._get_jit_propensities_function(reaction_to_k, parameters)
+        return self._get_propensities_function(reaction_to_k, parameters)
+
+    def _get_propensities_function(self, reaction_to_k=None, parameters=None):
+        k = self.get_k(parameters=parameters, reaction_to_k=reaction_to_k, jit=False)
         def calculate_propensities(t, y):
             if isinstance(k, np.ndarray):
                 k_of_t = k
@@ -430,9 +535,9 @@ class Model():
             return np.prod(binom(np.expand_dims(y, axis=1), self.kinetic_order()), axis=0) * k_of_t
         return calculate_propensities
 
-    def _get_jit_propensities_function(self, parameters=None):
+    def _get_jit_propensities_function(self, reaction_to_k=None, parameters=None):
         kinetic_order_matrix = self.kinetic_order()
-        k_jit = self.get_k(parameters=parameters, jit=True)
+        k_jit = self.get_k(reaction_to_k=reaction_to_k, parameters=parameters, jit=True)
         @numba.jit(nopython=True)
         def jit_calculate_propensities(t, y):
             # Remember, we want total number of distinct combinations * k === rate.
@@ -463,13 +568,32 @@ class Model():
             return product_down_columns * k
         return jit_calculate_propensities
 
-    def get_dydt_function(self, jit=False, **kwargs):
-        if jit:
-            return self._get_jit_dydt_function(**kwargs)
-        return self._get_dydt_function(**kwargs)
+    def get_dydt(self, reaction_to_k: dict=None, parameters: dict=None, jit: bool=False):
+        """Returns dydt(t,y), a function that calculates the time derivative of the system.
 
-    def _get_dydt_function(self, parameters=None):
-        calculate_propensities = self.get_propensities_function(parameters=parameters)
+        Parameters
+        ----------
+        reaction_to_k : dict, optional
+            A mapping of reaction: k float or k(t) for reactions
+            where k was not already specified, by default None
+        parameters : dict, optional
+            A mapping of parameter_name: value for evaluating lazily defined rate constants,
+            by default None
+        jit : bool, optional
+            If True, use numba.jit(nopython=True) to return low-level callable (i.e. faster)
+            version of k(t), by default False.
+
+        Returns
+        -------
+        dydt
+            The function dydt(t, y) that gives the time derivative of a system in state y at time t.
+        """
+        if jit:
+            return self._get_jit_dydt_function(reaction_to_k=reaction_to_k, parameters=parameters)
+        return self._get_dydt(reaction_to_k=reaction_to_k, parameters=parameters)
+
+    def _get_dydt(self, reaction_to_k=None, parameters=None):
+        calculate_propensities = self.get_propensities_function(reaction_to_k=reaction_to_k, parameters=parameters)
         N = self.stoichiometry()
         def dydt(t, y):
             propensities = calculate_propensities(t, y)
@@ -481,8 +605,8 @@ class Model():
             return dydt
         return dydt
 
-    def _get_jit_dydt_function(self, parameters=None):
-        jit_calculate_propensities = self._get_jit_propensities_function(parameters=parameters)
+    def _get_jit_dydt_function(self, reaction_to_k=None, parameters=None):
+        jit_calculate_propensities = self._get_jit_propensities_function(reaction_to_k=reaction_to_k, parameters=parameters)
         N = self.stoichiometry()
         @numba.jit(nopython=True)
         def jit_dydt(t, y):
@@ -496,7 +620,22 @@ class Model():
 
         return jit_dydt
 
-    def make_initial_condition(self, dictionary, parameters=None):
+    def make_initial_condition(self, dictionary: dict, parameters: dict=None):
+        """Given a dictionary of species_name: quantity, return the state of the system.
+
+        Parameters
+        ----------
+        dictionary : dict
+            A mapping of species_name: quantity (float or string, see parameters arg)
+        parameters : dict, optional
+            A mapping of parameter_name: value used to evaluated all string
+            expressions in dictionary, by default None
+
+        Returns
+        -------
+        np.ndarray
+            A vector of quantities of each species in the system.
+        """
         if parameters is None:
             parameters = {}
         x0 = np.zeros(self.n_species)
