@@ -61,7 +61,7 @@ reactions:
 species:
 - name: A
 ```
-In [`examples/`](examples/) you can several systems that show different features of the file specification, including the ability to programatically generate groups of related species and reactions.
+In [`examples/`](examples/) you can explore several systems that show different features of the file specification, including the ability to programatically generate groups of related species and reactions.
 
 # Installation
 

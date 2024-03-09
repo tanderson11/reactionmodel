@@ -10,6 +10,8 @@ import numpy as np
 from scipy.special import binom
 from simpleeval import simple_eval
 
+import reactionmodel.syntax
+
 NO_NUMBA = False
 try:
     import numba
@@ -669,6 +671,36 @@ class Model():
                 v = eval_expression(v, parameters)
             x0[self.species_name_index[k]] = float(v)
         return x0
+
+    @classmethod
+    def parse_model(cls, families, species, reactions, syntax=reactionmodel.syntax.Syntax()):
+        all_species = []
+        for s in species:
+            all_species.extend(reactionmodel.syntax.expand_families(families, s, syntax=syntax))
+        all_reactions = []
+        for r in reactions:
+            all_reactions.extend(reactionmodel.syntax.expand_families(families, r, syntax=syntax))
+        model_dict = {
+            'species'  : all_species,
+            'reactions': all_reactions,
+        }
+        return cls.from_dict(model_dict)
+
+    @classmethod
+    def load(cls, filename, format='yaml', syntax=reactionmodel.syntax.Syntax()):
+        if format=='yaml':
+            import yaml
+            with open(filename, 'r') as f:
+                d = yaml.load(f, Loader=yaml.SafeLoader)
+        elif format=='json':
+            import json
+            with open(filename, 'r') as f:
+                d = json.load(f)
+        else:
+            raise ValueError(f"format should be one of yaml or json was {format}")
+        families = d.get('families', {})
+        return cls.parse_model(families, d['species'], d['reactions'], syntax=syntax)
+
 
 class JitNotImplementedError(Exception):
     """Could not craft numba.jit function because of limitations of numba's nopython mode."""
