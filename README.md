@@ -8,11 +8,11 @@ This package makes it easy to specify any physical system that can be written in
 
 To use this package, you will interface with its three core types: `Species`, `Reaction`, and `Model`. They are described below:
 
-- `Species`: a countable thing within the system. Examples include rabbits, carbon dioxide, and HIV free virions.
+- `Species`: a countable thing within the system. Examples include rabbits, methanol, and HIV free virions.
 ```python
 s = Species(name, description="an optional longer description")
 ```
-- `Reaction`: a process that converts one or more `Species` to one or more other different `Species` according to a rate law.
+- `Reaction`: a process that converts one or more `Species` to one or more other different `Species` according to a rate law. Examples include the death of rabbits due to old age, the oxidation of methanol to formaldehyde, and the entry of HIV free virus into CD4+ target cells.
 ```python
 r = Reaction(reactants, products, description="an optional informative description")
 ```
@@ -32,9 +32,12 @@ prey = Species('Prey')
 predator = Species('Predator')
 
 reactions = []
+# when a single species appears more than once on one side of reaction
+# specify a tuple of (Species, multiplicity)
 reactions.append(Reaction([prey], [(prey, 2)], k="alpha", description="prey birth"))
 reactions.append(Reaction([prey, predator], [predator], k="beta", description="prey death"))
 reactions.append(Reaction([predator, prey], [(predator, 2)], k="delta", description="predator birth"))
+# when no products are formed or no reactants are involved, provide the empty set []
 reactions.append(Reaction([predator], [], k="gamma", description="predator death"))
 
 m = Model([prey, predator], reactions)
