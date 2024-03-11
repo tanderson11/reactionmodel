@@ -4,6 +4,23 @@ This package makes it easy to specify any physical system that can be written in
 1. you don't have to think about how will you simulate the model while you're specifying it
 2. but when you do go to simulate, the right choices have been made to make it easy without giving up performance
 
+## The three key types
+
+To use this package, you will interface with its three core types: `Species`, `Reaction`, and `Model`. They are described below:
+
+- `Species`: a countable thing within the system. Examples include rabbits, carbon dioxide, and HIV free virions.
+```python
+s = Species(name, description="an optional longer description")
+```
+- `Reaction`: a process that converts one or more `Species` to one or more other different `Species` according to a rate law.
+```python
+r = Reaction(reactants, products, description="an optional informative description")
+```
+- `Model`: a collection of reactions.
+```python
+m = Model(species, reactions)
+```
+
 ## Example 1
 Here's an example of specifying a [Lotka-Volterra](https://en.wikipedia.org/wiki/Lotka–Volterra_equations) predator prey model:
 
