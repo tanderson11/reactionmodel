@@ -84,7 +84,7 @@ class Reaction():
             object.__setattr__(self, 'products', (self.products,))
         if not isinstance(self.products, tuple):
             object.__setattr__(self, 'products', tuple(self.products))
-        if not isinstance(self.kinetic_orders, (tuple, type(None))):
+        if not isinstance(self.kinetic_orders, type(None)):
             object.__setattr__(self, 'kinetic_orders', tuple(self.kinetic_orders))
         assert(isinstance(self.reactants, tuple))
         assert(isinstance(self.kinetic_orders, (tuple, type(None))))
@@ -96,7 +96,7 @@ class Reaction():
             assert(isinstance(product, (tuple, Species)))
 
         # None or zero length
-        if not self.kinetic_orders:
+        if self.kinetic_orders is None:
             object.__setattr__(self, 'kinetic_orders', self.reactants)
         assert self.reversible is False, "Reversible reactions are not supported. Create separate forward and back reactions instead."
 
