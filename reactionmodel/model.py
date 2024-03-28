@@ -2,6 +2,7 @@ from enum import Enum
 from dataclasses import dataclass
 from dataclasses import asdict
 from functools import cached_property
+from keyword import iskeyword
 
 from typing import NamedTuple
 from types import FunctionType as function
@@ -22,6 +23,10 @@ except ModuleNotFoundError:
 def eval_expression(expression, parameters):
     """Evaluate lazily defined parameter as expression in the context of the provided parameters."""
     print(f"Evaluating expression: {expression} =>", end=" ")
+
+    for k in parameters.keys():
+        if iskeyword(k):
+            raise ValueError(f"parameter named {k} conflicted with Python keyword")
 
     if not isinstance(parameters, dict):
         parameters = parameters.asdict()
@@ -509,6 +514,9 @@ class Model():
                 k[family.slice_bottom:family.slice_top] = family.k(t)
             return k
         return k
+
+    def legend(self):
+        return [s.name for s in self.species]
 
     def stoichiometry(self):
         """Return stoichiometry matrix N of model.
