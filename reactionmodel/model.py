@@ -699,10 +699,10 @@ class Model():
     def parse_model(cls, families, species, reactions, syntax=reactionmodel.syntax.Syntax()):
         all_species = []
         for s in species:
-            all_species.extend(reactionmodel.syntax.expand_families(families, s, syntax=syntax))
+            all_species.extend(syntax.expand_families(families, s, syntax=syntax))
         all_reactions = []
         for r in reactions:
-            all_reactions.extend(reactionmodel.syntax.expand_families(families, r, syntax=syntax))
+            all_reactions.extend(syntax.expand_families(families, r, syntax=syntax))
         model_dict = {
             'species'  : all_species,
             'reactions': all_reactions,
