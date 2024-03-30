@@ -119,6 +119,13 @@ class Reaction():
         selfdict['k'] = self.k
         return selfdict
 
+    def order(self):
+        order = 0
+        for rt in self.kinetic_orders:
+            multiplicity = rt[1] if isinstance(rt, tuple) else 1
+            order += multiplicity
+        return order
+
     @cached_property
     def reactant_species(self):
         """The set of Species involved as reactants."""
@@ -644,7 +651,7 @@ class Model():
         jit_calculate_propensities = self._get_jit_propensities_function(reaction_to_k=reaction_to_k, parameters=parameters)
         N = self.stoichiometry()
         @numba.jit(nopython=True)
-        def jit_dydt(t, y):
+        def jit_dydt(t, y, propensity_function):
             propensities = jit_calculate_propensities(t, y)
 
             # each propensity feeds back into the stoich matrix to determine
