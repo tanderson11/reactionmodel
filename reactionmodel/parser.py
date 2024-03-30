@@ -36,7 +36,7 @@ def parse_parameters(parameters_dict):
 
 def parse_initial_condition(families, ic_dict, syntax=reactionmodel.syntax.Syntax()):
     # we get a list of dictionaries with families expanded
-    all_entries = syntax.expand_families(families, ic_dict, syntax=syntax)
+    all_entries = syntax.expand_families(families, ic_dict)
     # combine all those entries into single dictionary
     return reduce(lambda x,y: {**x, **y}, all_entries)
 
