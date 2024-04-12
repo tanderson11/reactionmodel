@@ -6,7 +6,7 @@ authors = ["Thayer Anderson <tanderson11@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = ">=3.9,<3.11"
 numpy = "^1.25"
 simpleeval = "^0.9.13"
 pandas = "^2.1.4"

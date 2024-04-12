@@ -89,10 +89,12 @@ class Reaction():
             object.__setattr__(self, 'products', (self.products,))
         if not isinstance(self.products, tuple):
             object.__setattr__(self, 'products', tuple(self.products))
-        if not isinstance(self.kinetic_orders, type(None)):
+        if (not isinstance(self.kinetic_orders, type(None))) and len(self.kinetic_orders) != 0:
             object.__setattr__(self, 'kinetic_orders', tuple(self.kinetic_orders))
+        else:
+            object.__setattr__(self, 'kinetic_orders', None)
         assert(isinstance(self.reactants, tuple))
-        assert(isinstance(self.kinetic_orders, (tuple, type(None))))
+        assert(isinstance(self.kinetic_orders, (tuple, type(None)))), self.kinetic_orders
         assert(isinstance(self.products, tuple))
 
         for reactant in self.reactants:
@@ -110,8 +112,9 @@ class Reaction():
         selfdict = {}
         if self.description:
             selfdict['description'] = self.description
-        selfdict['reactants'] = [r.name for r in self.reactants]
-        selfdict['products'] = [p.name for p in self.products]
+        selfdict['reactants'] = [r.name if isinstance(r, Species) else (r[0].name, r[1]) for r in self.reactants]
+        selfdict['products']  = [p.name if isinstance(p, Species) else (p[0].name, p[1]) for p in self.products ]
+
         if self.kinetic_orders != self.reactants:
             selfdict['kinetic_orders'] = self.kinetic_orders
         if self.reversible:
