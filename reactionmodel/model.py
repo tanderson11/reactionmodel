@@ -521,7 +521,9 @@ class Model():
         def k(t):
             k = base_k.copy()
             for family in k_families:
-                k[family.slice_bottom:family.slice_top] = family.k(t)
+                kt = family.k(t)
+                if kt.shape != k[family.slice_bottom:family.slice_top].shape: raise ValueError(f"k function of ReactionRateFamily {family} failed to produce output of the right size")
+                k[family.slice_bottom:family.slice_top] = kt
             return k
         return k
 

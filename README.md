@@ -56,6 +56,7 @@ parameters = {
 dydt = m.get_dydt(parameters=parameters)
 result = scipy.integrate.solve_ivp(dydt, [0.0, 100.0], y0=[10.0, 10.0])
 plt.plot(result.t, result.y.T)
+plt.legend(m.legend())
 ```
 ![Solution to our Lotka Volterra equations](examples/lotka.png)
 
@@ -121,7 +122,7 @@ pipx install poetry
 
 ## Using Poetry
 
-Now that you have Poetry installed, you may use it to manage Python environments on a per-project basis. Navigate to your project and initialize a poetry environment
+Now that you have Poetry installed, you may use it to manage Python environments on a per-project basis. Navigate to your project and initialize a poetry environment. (When you run `poetry init` you will be asked a series of questions about your package. You can always go back and change your choices.)
 ```bash
 cd project/
 poetry init
