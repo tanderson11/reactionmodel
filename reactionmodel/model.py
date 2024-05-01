@@ -351,6 +351,12 @@ class Model():
     def to_dict(self):
         return {'species': [s.to_dict() for s in self.species], 'reactions': [r.to_dict() for r in self.reaction_groups]}
 
+    def y_to_dict(self, y):
+        y_dict = {}
+        for s, y_i in zip(self.species, list(y)):
+            y_dict[s] = y_i
+        return y_dict
+
     def save(self, filename, format='yaml'):
         if format=='yaml':
             import yaml
