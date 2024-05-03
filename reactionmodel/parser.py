@@ -40,6 +40,7 @@ def parse_initial_condition(families, ic_dict, syntax=reactionmodel.syntax.Synta
     # combine all those entries into single dictionary
     return reduce(lambda x,y: {**x, **y}, all_entries)
 
+@dataclass
 class ConfigParser():
     '''A class for parsing configuration dictionaries/files associated with forward simulators.
 
@@ -47,7 +48,7 @@ class ConfigParser():
 
     key = 'simulator_config'
     @classmethod
-    def parse_dictionary(cls, config_dictionary):
+    def from_dict(cls, config_dictionary):
         return config_dictionary
 
     @classmethod
@@ -59,7 +60,7 @@ class ConfigParser():
                 data = json.load(f)
             else:
                 raise ValueError(f"Expected format keyword to be one of 'json' or 'yaml' found {format}")
-        return cls.parse_dictionary(data[cls.key])
+        return cls.from_dict(data[cls.key])
 
 def loads(data, syntax=reactionmodel.syntax.Syntax(), ConfigParser=ConfigParser):
     used_keys = []
@@ -84,7 +85,7 @@ def loads(data, syntax=reactionmodel.syntax.Syntax(), ConfigParser=ConfigParser)
 
     if 'simulator_config' in data.keys():
         used_keys.append('simulator_config')
-        simulator_config = ConfigParser.parse_dictionary(data['simulator_config'])
+        simulator_config = ConfigParser.from_dict(data['simulator_config'])
 
     return ParseResults(model, parameters, initial_condition, simulator_config)
 

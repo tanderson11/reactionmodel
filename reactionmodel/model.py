@@ -359,7 +359,7 @@ class Model():
         if format=='yaml':
             import yaml
             with open(filename, 'w') as f:
-                yaml.dump(self.to_dict(), f, Dumper=yaml.SafeDumper)
+                yaml.dump(self.to_dict(), f, Dumper=yaml.SafeDumper, sort_keys=False)
         elif format=='json':
             import json
             with open(filename, 'w') as f:
