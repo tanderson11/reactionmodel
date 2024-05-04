@@ -63,3 +63,6 @@ class LoadModelTestCase(unittest.TestCase):
 
         path = './examples/double_used_family'
         self.assertEqual(m, self.load_from_file(path))
+
+if __name__ == '__main__':
+    unittest.main()

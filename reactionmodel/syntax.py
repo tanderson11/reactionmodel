@@ -17,10 +17,10 @@ class Syntax():
     def family_replace(self, family_names, idx, chosen_members, value, do_nestings=False):
         for family_name, member, i in zip(family_names, chosen_members, idx):
             if do_nestings and isinstance(value, (tuple, list)):
-                value = [self.family_replace(family_names, idx, chosen_members, v, self, do_nestings) for v in value]
+                value = [self.family_replace(family_names, idx, chosen_members, v, do_nestings) for v in value]
                 continue
             if do_nestings and isinstance(value, dict):
-                value = {k:self.family_replace(family_names, idx, chosen_members, v, self, do_nestings) for k,v in value.items()}
+                value = {k:self.family_replace(family_names, idx, chosen_members, v, do_nestings) for k,v in value.items()}
                 continue
             if isinstance(value, (int, float)):
                 continue
