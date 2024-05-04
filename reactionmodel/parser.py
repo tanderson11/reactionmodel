@@ -1,6 +1,7 @@
 import json
 from functools import reduce
 from dataclasses import dataclass
+from typing import NamedTuple
 
 import yaml
 from yaml import SafeLoader as Loader
@@ -9,6 +10,10 @@ import pandas as pd
 
 from reactionmodel.model import Model
 import reactionmodel.syntax
+
+class T(NamedTuple):
+    t_span: tuple
+    t_eval: tuple = None
 
 @dataclass
 class ParseResults():
@@ -77,9 +82,10 @@ def loads(data, syntax=reactionmodel.syntax.Syntax(), ConfigParser=ConfigParser)
         used_keys.append('parameters')
         kwargs['parameters'] = parse_parameters(data['parameters'])
 
-    if 'tspan' in data.keys():
-        used_keys.append('tspan')
-        kwargs['tspan'] = tuple(data['tspan'])
+    if 't' in data.keys():
+        used_keys.append('t')
+        t_data = data['t']
+        kwargs['t'] = T(**t_data)
 
     if 'initial_condition' in data.keys():
         used_keys.append('initial_condition')
