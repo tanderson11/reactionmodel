@@ -19,7 +19,7 @@ class T(NamedTuple):
 class ParseResults():
     model: Model = None
     parameters: dict = None
-    tspan: dict = None
+    t: T = None
     initial_condition: dict = None
     simulator_config: dict = None
 
