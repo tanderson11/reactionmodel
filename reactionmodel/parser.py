@@ -12,10 +12,11 @@ import reactionmodel.syntax
 
 @dataclass
 class ParseResults():
-    model: Model
-    parameters: dict
-    initial_condition: dict
-    simulator_config: dict
+    model: Model = None
+    parameters: dict = None
+    tspan: dict = None
+    initial_condition: dict = None
+    simulator_config: dict = None
 
 def parse_parameters(parameters_dict):
     parameters = {}
@@ -65,31 +66,36 @@ class ConfigParser():
 def loads(data, syntax=reactionmodel.syntax.Syntax(), ConfigParser=ConfigParser):
     used_keys = []
 
-    model = None
-    parameters = None
-    initial_condition = None
-    simulator_config = None
+    kwargs = {}
 
     families = data.get('families', {})
     if set(['species', 'reactions']).issubset(data.keys()):
         used_keys.extend(['species', 'reactions'])
-        model = Model.parse_model(families, data['species'], data['reactions'], syntax=syntax)
+        kwargs['model'] = Model.parse_model(families, data['species'], data['reactions'], syntax=syntax)
 
     if 'parameters' in data.keys():
         used_keys.append('parameters')
-        parameters = parse_parameters(data['parameters'])
+        kwargs['parameters'] = parse_parameters(data['parameters'])
+
+    if 'tspan' in data.keys():
+        used_keys.append('tspan')
+        kwargs['tspan'] = tuple(data['tspan'])
 
     if 'initial_condition' in data.keys():
         used_keys.append('initial_condition')
-        initial_condition = parse_initial_condition(families, data['initial_condition'], syntax=syntax)
+        kwargs['initial_condition'] = parse_initial_condition(families, data['initial_condition'], syntax=syntax)
 
     if 'simulator_config' in data.keys():
         used_keys.append('simulator_config')
-        simulator_config = ConfigParser.from_dict(data['simulator_config'])
+        kwargs['simulator_config'] = ConfigParser.from_dict(data['simulator_config'])
 
-    return ParseResults(model, parameters, initial_condition, simulator_config)
+    return ParseResults(**kwargs)
 
 def load(path, format='yaml', ConfigParser=ConfigParser):
+    data = load_dictionary(path, format)
+    return loads(data, ConfigParser=ConfigParser)
+
+def load_dictionary(path, format='yaml'):
     with open(path, 'r') as f:
         if format == 'yaml':
             data = yaml.load(f, Loader=Loader)
@@ -97,4 +103,4 @@ def load(path, format='yaml', ConfigParser=ConfigParser):
             data = json.load(f)
         else:
             raise ValueError(f"Expected format keyword to be one of 'json' or 'yaml' found {format}")
-    return loads(data, ConfigParser=ConfigParser)
+    return data
