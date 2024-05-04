@@ -91,9 +91,13 @@ def loads(data, syntax=reactionmodel.syntax.Syntax(), ConfigParser=ConfigParser)
 
     return ParseResults(**kwargs)
 
-def load(path, format='yaml', ConfigParser=ConfigParser):
-    data = load_dictionary(path, format)
-    return loads(data, ConfigParser=ConfigParser)
+def load(*paths, format='yaml', ConfigParser=ConfigParser):
+    """Combines yaml/json data from a variety of paths into one dictionary. Then loads a specification from the data."""
+    d = {}
+    for p in paths:
+        d.update(reactionmodel.parser.load_dictionary(p, format=format))
+
+    return loads(d, ConfigParser=ConfigParser)
 
 def load_dictionary(path, format='yaml'):
     with open(path, 'r') as f:
