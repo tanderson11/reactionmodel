@@ -1,7 +1,6 @@
 import json
 from functools import reduce
 from dataclasses import dataclass
-from typing import NamedTuple
 
 import yaml
 from yaml import SafeLoader as Loader
@@ -11,7 +10,8 @@ import pandas as pd
 from reactionmodel.model import Model
 import reactionmodel.syntax
 
-class T(NamedTuple):
+@dataclass
+class T():
     t_span: tuple
     t_eval: tuple = None
 
