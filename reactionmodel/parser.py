@@ -101,7 +101,9 @@ def load(*paths, format='yaml', ConfigParser=ConfigParser):
     """Combines yaml/json data from a variety of paths into one dictionary. Then loads a specification from the data."""
     d = {}
     for p in paths:
-        d.update(reactionmodel.parser.load_dictionary(p, format=format))
+        new = reactionmodel.parser.load_dictionary(p, format=format)
+        if new is not None:
+            d.update(new)
 
     return loads(d, ConfigParser=ConfigParser)
 

@@ -696,9 +696,9 @@ class Model():
             x0[self.species_name_index[k]] = float(v)
         return x0
 
-    def get_simulator(self, simulator_class, parameters=None, jit=False, **simulator_kwargs):
+    def get_simulator(self, simulator_class, reaction_to_k=None, parameters=None, jit=False, **simulator_kwargs):
         return simulator_class(
-            self.get_k(parameters=parameters, jit=jit),
+            self.get_k(reaction_to_k=reaction_to_k, parameters=parameters, jit=jit),
             self.stoichiometry(),
             self.kinetic_order(),
             **simulator_kwargs
