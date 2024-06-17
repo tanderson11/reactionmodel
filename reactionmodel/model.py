@@ -78,9 +78,11 @@ class Reaction():
     kinetic_orders: tuple[Species] = None
     reversible: bool = False
     k: float = None
+    poisson_products: bool = False
 
     def __post_init__(self):
         """Ensure everything that should be a tuple is. Add default kinetic orders if unspecified."""
+        #import pdb; pdb.set_trace()
         if isinstance(self.reactants, Species) or isinstance(self.reactants, tuple):
             object.__setattr__(self, 'reactants', (self.reactants,))
         if not isinstance(self.reactants, tuple):
@@ -106,6 +108,8 @@ class Reaction():
         if self.kinetic_orders is None:
             object.__setattr__(self, 'kinetic_orders', self.reactants)
         assert self.reversible is False, "Reversible reactions are not supported. Create separate forward and back reactions instead."
+        assert(isinstance(self.poisson_products, bool))
+
 
     def to_dict(self):
         """Return dictionary representation of self."""
@@ -336,6 +340,12 @@ class Model():
                 self.all_reactions.extend(r.reactions)
             else:
                 raise TypeError(f"bad type for reaction in model: {type(r)}. Expected Reaction or ReactionRateFamily")
+
+        self.poisson_product_mask = np.full(len(self.all_reactions), False)
+
+        for i,r in enumerate(self.all_reactions):
+            if r.poisson_products:
+                self.poisson_product_mask[i] = True
 
         self.n_species = len(self.species)
         self.n_reactions = len(self.all_reactions)
