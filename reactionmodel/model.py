@@ -78,11 +78,9 @@ class Reaction():
     kinetic_orders: tuple[Species] = None
     reversible: bool = False
     k: float = None
-    poisson_products: bool = False
 
     def __post_init__(self):
         """Ensure everything that should be a tuple is. Add default kinetic orders if unspecified."""
-        #import pdb; pdb.set_trace()
         if isinstance(self.reactants, Species) or isinstance(self.reactants, tuple):
             object.__setattr__(self, 'reactants', (self.reactants,))
         if not isinstance(self.reactants, tuple):
@@ -104,12 +102,22 @@ class Reaction():
         for product in self.products:
             assert(isinstance(product, (tuple, Species)))
 
+        self.verify_integer(self.reactants)
+        self.verify_integer(self.products)
+
         # None or zero length
         if self.kinetic_orders is None:
             object.__setattr__(self, 'kinetic_orders', self.reactants)
-        assert self.reversible is False, "Reversible reactions are not supported. Create separate forward and back reactions instead."
-        assert(isinstance(self.poisson_products, bool))
 
+        assert self.reversible is False, "Reversible reactions are not supported. Create separate forward and back reactions instead."
+
+    @staticmethod
+    def verify_integer(species_set):
+        for t in species_set:
+            if not isinstance(t, tuple):
+                continue
+            multiplicity = t[1]
+            assert(isinstance(multiplicity, (int, np.integer)))
 
     def to_dict(self):
         """Return dictionary representation of self."""
@@ -254,6 +262,38 @@ class RateConstantCluster(NamedTuple):
     slice_bottom: int
     slice_top: int
 
+@dataclass(frozen=True)
+class ReactionRateFamily():
+    reactions: tuple[Reaction]
+    k: callable
+
+    def __post_init__(self):
+        if isinstance(self.reactions, list):
+            object.__setattr__(self, 'reactions', tuple(self.reactions))
+        assert(isinstance(self.reactions, tuple))
+
+    def used(self):
+        used = set()
+        for r in self.reactions:
+            for s in r.used():
+                used.add(s)
+        return used
+
+    def to_dict(self):
+        return {'reactions': [asdict(r) for r in self.reactions], 'k': self.k.__name__}
+
+    @classmethod
+    def from_dict(cls, reactions, species_context, k):
+        self_dict = {}
+        our_reactions = []
+        for r_dict in reactions:
+            our_reactions.append(Reaction.from_dict(r_dict, species_context))
+
+        self_dict['reactions'] = our_reactions
+        self_dict['k'] = k
+
+        return cls(**self_dict)
+
 class UnusedSpeciesError(Exception):
     """Model was provided a Species that was used in 0 Reactions."""
 
@@ -341,12 +381,6 @@ class Model():
             else:
                 raise TypeError(f"bad type for reaction in model: {type(r)}. Expected Reaction or ReactionRateFamily")
 
-        self.poisson_product_mask = np.full(len(self.all_reactions), False)
-
-        for i,r in enumerate(self.all_reactions):
-            if r.poisson_products:
-                self.poisson_product_mask[i] = True
-
         self.n_species = len(self.species)
         self.n_reactions = len(self.all_reactions)
 
@@ -378,13 +412,13 @@ class Model():
             raise ValueError(f"format should be one of yaml or json was {format}")
 
     @classmethod
-    def from_dict(cls, dictionary, functions_by_name=None):
+    def from_dict(cls, dictionary, functions_by_name=None, species_class=Species, reaction_class=Reaction, reaction_rate_family_class=ReactionRateFamily):
         if functions_by_name is None:
             functions_by_name = {}
         dictionary = dictionary.copy()
         species = {}
         for species_dict in dictionary.pop('species'):
-            s = Species(**species_dict)
+            s = species_class(**species_dict)
             species[s.name] = s
 
         reactions = []
@@ -392,11 +426,11 @@ class Model():
             # is it a ReactionRateFamily?
             if 'reactions' in reaction_dict.keys():
                 try:
-                    reactions.append(ReactionRateFamily.from_dict(reaction_dict['reactions'], species, functions_by_name[reaction_dict['k']]))
+                    reactions.append(reaction_rate_family_class.from_dict(reaction_dict['reactions'], species, functions_by_name[reaction_dict['k']]))
                 except KeyError as exc:
                     raise KeyError(f'failed to find function with name {reaction_dict["k"]} when loading a Model that has a ReactionRateFamily. Did you a pass the keyword argument functions_by_name?') from exc
                 continue
-            reactions.append(Reaction.from_dict(reaction_dict, species))
+            reactions.append(reaction_class.from_dict(reaction_dict, species))
 
         species = [s for s in species.values()]
         return cls(species, reactions, **dictionary)
@@ -715,7 +749,7 @@ class Model():
         )
 
     @classmethod
-    def parse_model(cls, families, species, reactions, syntax=reactionmodel.syntax.Syntax()):
+    def parse_model(cls, families, species, reactions, syntax=reactionmodel.syntax.Syntax(), **kwargs):
         all_species = []
         for s in species:
             all_species.extend(syntax.expand_families(families, s))
@@ -726,7 +760,7 @@ class Model():
             'species'  : all_species,
             'reactions': all_reactions,
         }
-        return cls.from_dict(model_dict)
+        return cls.from_dict(model_dict, **kwargs)
 
     @classmethod
     def load(cls, filename, format='yaml', syntax=reactionmodel.syntax.Syntax()):
@@ -746,35 +780,3 @@ class Model():
 
 class JitNotImplementedError(Exception):
     """Could not craft numba.jit function because of limitations of numba's nopython mode."""
-
-@dataclass(frozen=True)
-class ReactionRateFamily():
-    reactions: tuple[Reaction]
-    k: callable
-
-    def __post_init__(self):
-        if isinstance(self.reactions, list):
-            object.__setattr__(self, 'reactions', tuple(self.reactions))
-        assert(isinstance(self.reactions, tuple))
-
-    def used(self):
-        used = set()
-        for r in self.reactions:
-            for s in r.used():
-                used.add(s)
-        return used
-
-    def to_dict(self):
-        return {'reactions': [asdict(r) for r in self.reactions], 'k': self.k.__name__}
-
-    @classmethod
-    def from_dict(cls, reactions, species_context, k):
-        self_dict = {}
-        our_reactions = []
-        for r_dict in reactions:
-            our_reactions.append(Reaction.from_dict(r_dict, species_context))
-
-        self_dict['reactions'] = our_reactions
-        self_dict['k'] = k
-
-        return cls(**self_dict)
