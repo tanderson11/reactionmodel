@@ -283,11 +283,11 @@ class ReactionRateFamily():
         return {'reactions': [asdict(r) for r in self.reactions], 'k': self.k.__name__}
 
     @classmethod
-    def from_dict(cls, reactions, species_context, k):
+    def from_dict(cls, reactions, species_context, k, reaction_class=Reaction):
         self_dict = {}
         our_reactions = []
         for r_dict in reactions:
-            our_reactions.append(Reaction.from_dict(r_dict, species_context))
+            our_reactions.append(reaction_class.from_dict(r_dict, species_context))
 
         self_dict['reactions'] = our_reactions
         self_dict['k'] = k
@@ -426,7 +426,7 @@ class Model():
             # is it a ReactionRateFamily?
             if 'reactions' in reaction_dict.keys():
                 try:
-                    reactions.append(reaction_rate_family_class.from_dict(reaction_dict['reactions'], species, functions_by_name[reaction_dict['k']]))
+                    reactions.append(reaction_rate_family_class.from_dict(reaction_dict['reactions'], species, functions_by_name[reaction_dict['k']], reaction_class=reaction_class))
                 except KeyError as exc:
                     raise KeyError(f'failed to find function with name {reaction_dict["k"]} when loading a Model that has a ReactionRateFamily. Did you a pass the keyword argument functions_by_name?') from exc
                 continue
