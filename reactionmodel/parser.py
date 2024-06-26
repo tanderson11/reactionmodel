@@ -68,7 +68,7 @@ class ConfigParser():
                 raise ValueError(f"Expected format keyword to be one of 'json' or 'yaml' found {format}")
         return cls.from_dict(data[cls.key])
 
-def loads(data, syntax=reactionmodel.syntax.Syntax(), ConfigParser=ConfigParser):
+def loads(data, syntax=reactionmodel.syntax.Syntax(), ConfigParser=ConfigParser, model_class=Model):
     used_keys = []
 
     kwargs = {}
@@ -76,7 +76,7 @@ def loads(data, syntax=reactionmodel.syntax.Syntax(), ConfigParser=ConfigParser)
     families = data.get('families', {})
     if set(['species', 'reactions']).issubset(data.keys()):
         used_keys.extend(['species', 'reactions'])
-        kwargs['model'] = Model.parse_model(families, data['species'], data['reactions'], syntax=syntax)
+        kwargs['model'] = model_class.parse_model(families, data['species'], data['reactions'], syntax=syntax)
 
     if 'parameters' in data.keys():
         used_keys.append('parameters')
@@ -97,7 +97,7 @@ def loads(data, syntax=reactionmodel.syntax.Syntax(), ConfigParser=ConfigParser)
 
     return ParseResults(**kwargs)
 
-def load(*paths, format='yaml', ConfigParser=ConfigParser):
+def load(*paths, format='yaml', ConfigParser=ConfigParser, model_class=Model):
     """Combines yaml/json data from a variety of paths into one dictionary. Then loads a specification from the data."""
     d = {}
     for p in paths:
@@ -105,7 +105,7 @@ def load(*paths, format='yaml', ConfigParser=ConfigParser):
         if new is not None:
             d.update(new)
 
-    return loads(d, ConfigParser=ConfigParser)
+    return loads(d, ConfigParser=ConfigParser, model_class=model_class)
 
 def load_dictionary(path, format='yaml'):
     with open(path, 'r') as f:
