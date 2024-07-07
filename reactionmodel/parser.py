@@ -30,7 +30,11 @@ def parse_parameters(parameters_dict):
             p_dict = p.copy()
             path = p_dict.pop('path')
             header = p_dict.pop('header', None)
-            value = np.array(pd.read_csv(path, header=header), dtype=float)
+            try:
+                value = np.array(pd.read_csv(path, header=header), dtype=float)
+            except ValueError:
+                value = np.array(pd.read_csv(path, header=header))
+                print("While loading parameter matrix, encountered non-float objects. Treating them as string representations of parameters.")
         else:
             try:
                 value = float(p)
