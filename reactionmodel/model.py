@@ -338,7 +338,7 @@ class Model():
     get_dydt(reaction_to_k=None, parameters=None, jit=False)
         Return a function dydt(t, y) that gives the time derivative of species quantities at time t.
     """
-    def __init__(self, species: list[Species], reactions: list[Reaction]) -> None:
+    def __init__(self, species: list[Species], reactions: list[Reaction], reject_duplicates=True) -> None:
         """Make a model for the given species and reactions.
 
         Parameters
@@ -371,10 +371,11 @@ class Model():
             species = [species]
         if len(species) == 0:
             raise ValueError("species must include at least one species.")
-        if len(species) != len(set(species)):
-            raise ValueError(f"expected all species to be unique. Duplicates: {find_duplicates(species)}")
-        if len(reactions) != len(set(reactions)):
-            raise ValueError(f"expected all reactions to be unique Duplicates: {find_duplicates(reactions)}")
+        if reject_duplicates:
+            if len(species) != len(set(species)):
+                raise ValueError(f"expected all species to be unique. Duplicates: {find_duplicates(species)}")
+            if len(reactions) != len(set(reactions)):
+                raise ValueError(f"expected all reactions to be unique Duplicates: {find_duplicates(reactions)}")
         self.species = species
         self.all_reactions = []
         self.reaction_groups = []
