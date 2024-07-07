@@ -20,6 +20,16 @@ try:
 except ModuleNotFoundError:
     NO_NUMBA = True
 
+def find_duplicates(collection):
+    s = set()
+    duplicates = set()
+    for x in collection:
+        if x not in s:
+            s.add(x)
+            continue
+        duplicates.add(x)
+    return duplicates
+
 def eval_expression(expression, parameters):
     """Evaluate lazily defined parameter as expression in the context of the provided parameters."""
     print(f"Evaluating expression: {expression} =>", end=" ")
@@ -362,9 +372,9 @@ class Model():
         if len(species) == 0:
             raise ValueError("species must include at least one species.")
         if len(species) != len(set(species)):
-            raise ValueError("expected all species to be unique")
+            raise ValueError(f"expected all species to be unique. Duplicates: {find_duplicates(species)}")
         if len(reactions) != len(set(reactions)):
-            raise ValueError("expected all reactions to be unique")
+            raise ValueError(f"expected all reactions to be unique Duplicates: {find_duplicates(reactions)}")
         self.species = species
         self.all_reactions = []
         self.reaction_groups = []

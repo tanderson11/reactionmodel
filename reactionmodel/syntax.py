@@ -29,6 +29,8 @@ class Syntax():
         return value
 
     def expand_families(self, families, atom):
+        if not isinstance(atom, dict):
+            raise TypeError(f"Instead of dictionary found {type(atom)}. Did you remember to prepend '-' to list items in yaml?")
         try:
             used_families = atom.pop('used_families')
         except KeyError:
