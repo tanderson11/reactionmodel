@@ -44,7 +44,12 @@ def eval_expression(expression, parameters):
     try:
         evaluated = float(evaluated)
     except ValueError as exc:
-        raise ValueError(f"Python evaluation the string {expression} did not produce a float literal (produced {evaluated})") from exc
+        # try to evaluate AGAIN in case we just found more lazy parameters inside of matrices
+        try:
+            evaluted_twice = simple_eval(evaluated, names=parameters)
+            evaluated = float(evaluted_twice)
+        except ValueError:
+            raise ValueError(f"Python evaluation of the string {expression} did not produce a float literal (produced {evaluated}). Tried evaluating twice in case of doubly-lazy dictionary and got {evaluted_twice}") from exc
     print(evaluated)
     return evaluated
 
@@ -489,9 +494,10 @@ class Model():
         """
         if reaction_to_k is None:
             reaction_to_k = {}
+        initial_reaction_to_k = reaction_to_k.copy()
         for r in self.reaction_groups:
             if r.k is not None:
-                assert r not in reaction_to_k.keys(), f"The rate constant for reaction {r} was already defined as {r.k} but it was also supplied as {reaction_to_k[r]} at runtime."
+                assert r not in initial_reaction_to_k.keys(), f"The rate constant for reaction {r} was already defined as {r.k} but it was also supplied as {reaction_to_k[r]} at runtime."
                 # now it's safe to use the presupplied value of k as there is no conflict
                 reaction_to_k[r] = r.k
 
