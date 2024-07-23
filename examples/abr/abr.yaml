@@ -1,0 +1,217 @@
+families:
+  strain: [M, DS, DR, X]
+  pathogenic: [DS, DR]
+
+  lowEfficacyTreatment: [M, X, DR, X]
+  midEfficacyTreatment: [X, X, DR, X]
+  highEfficacyTreatment: [X, X, X, X]
+
+# Delta_i: vector of combined discharge+death rates (main carriage)
+# rho[i][j][k]: admission rate of i,j,k
+# rhoX = rho[X][j][k] etc.
+# rhoM
+# rhoDS
+# rhoDR
+# W[s1][s2]: rate that s1 replaces s2 in the niche through competition
+# V[P][y]: probability that y successfully invades target niche given y is resdient
+# I[x]: probability that P instantly causes infection given x is majority resident
+# 
+
+
+species:
+- name: "<$i_$j_$k>"
+  used_families: {'i': 'strain', 'j': 'strain', 'k': 'strain'}
+
+reactions:
+## DISCHARGE / DEATH
+- description: discharge
+  reactants: [<$i_$j_$k>]
+  products: []
+  used_families: {'i': 'strain', 'j': 'strain', 'k': 'strain'}
+  k: Delta[#i]
+- description: death (relevant infection)
+  reactants: [<$i_$j_$k>]
+  products: []
+  used_families: {'i': 'strain', 'j': 'strain', 'k': 'strain'}
+  k: mu[#i]
+## ADMISSION
+- description: admission
+  reactants: []
+  products: [<M_$j_$k>]
+  used_families: {'j': 'strain', 'k': 'strain'}
+  k: rhoM[#j][#k]
+- description: admission
+  reactants: []
+  products: [<DS_$j_$k>]
+  used_families: {'j': 'strain', 'k': 'strain'}
+  k: rhoDS[#j][#k]
+- description: admission
+  reactants: []
+  products: [<DR_$j_$k>]
+  used_families: {'j': 'strain', 'k': 'strain'}
+  k: rhoDR[#j][#k]
+- description: admission
+  reactants: []
+  products: [<X_$j_$k>]
+  used_families: {'j': 'strain', 'k': 'strain'}
+  k: rhoX[#j][#k]
+## GROWTH
+- description: background repopulation with commensals
+  reactants: [<X_$j_$k>]
+  products: [<M_$j_$k>]
+  k: g0
+  used_families: {'j': 'strain', 'k': 'strain'}
+- description: background restoration of commensals
+  reactants: [<$P_$j_$k>]
+  products: [<M_$j_$k>]
+  k: gamma0
+  used_families: {'P': 'pathogenic', 'j': 'strain', 'k': 'strain'}
+- description: uninhibited growth of N1
+  reactants: [<X_$j_$k>]
+  products: [<$j_$j_$k>]
+  k: l
+  used_families: {'j': 'strain', 'k': 'strain'}
+  family_constraints: {constraint: '!=', families: [j, k]}
+- description: uninhibited growth of N2
+  reactants: [<X_$j_$k>]
+  products: [<$k_$j_$k>]
+  k: l
+  used_families: {'j': 'strain', 'k': 'strain'}
+  family_constraints: {constraint: '!=', families: [j, k]}
+- description: uninhibited growth of N1+N2
+  reactants: [<X_$j_$j>]
+  products: [<$j_$j_$j>]
+  k: 2*l
+  used_families: {'j': 'strain'}
+- description: overgrowth growth of pathogenic bacteria in N1
+  reactants: [<M_$P_$k>]
+  products: [<$P_$P_$k>]
+  k: lam
+  used_families: {'P': 'pathogenic', 'k': 'strain'}
+  family_constraints: {constraint: '!=', families: [k, P]}
+- description: overgrowth growth of pathogenic bacteria in N2
+  reactants: [<M_$j_$P>]
+  products: [<$P_$j_$P>]
+  k: lam
+  used_families: {'j': 'strain', 'P': 'pathogenic'}
+  family_constraints: {constraint: '!=', families: [j, P]}
+- description: overgrowth growth of pathogenic bacteria in N2
+  reactants: [<M_$P_$P>]
+  products: [<$P_$P_$P>]
+  k: 2*lam
+  used_families: {'P': 'pathogenic'}
+## COMPETITION
+- description: N1 displaces N2
+  reactants: [<$i_$j_$k>]
+  products: [<$i_$j_$j>]
+  k: W[#j][#k]
+  used_families: {'i': 'strain', 'j': 'strain', 'k': 'strain'}
+- description: N2 displaces N1
+  reactants: [<$i_$j_$k>]
+  products: [<$i_$k_$k>]
+  # strings in between ~~ will be substituted before evaluation, allowing chaining
+  k: (1-dWN) * ~W[#k][#j]~
+  used_families: {'i': 'strain', 'j': 'strain', 'k': 'strain'}
+## TRANSMISSION
+- description: transmission from main to N1 (without high carriage conversion)
+  reactants: [<$P_$j_$k>, <$x_$y_$z>]
+  products: [<$P_$j_$k>, <$x_$P_$z>]
+  used_families: {'j': 'strain', 'k': 'strain', 'P': 'pathogenic', 'x': 'strain', 'y': 'strain', 'z': 'strain'}
+  k: 1/(1+rBN) * beta * ~V[#P][#y]~ * (1 - ~I[#x]~) * pVN1
+  family_constraints: {constraint: '!=', families: [P, y]}
+- description: transmission from main to N1 (WITH high carriage conversion)
+  reactants: [<$P_$j_$k>, <$x_$y_$z>]
+  products: [<$P_$j_$k>, <$P_$P_$z>]
+  used_families: {'j': 'strain', 'k': 'strain', 'P': 'pathogenic', 'x': 'strain', 'y': 'strain', 'z': 'strain'}
+  k: 1/(1+rBN) * beta * ~V[#P][#y]~ * (~I[#x]~) * pVN1
+  family_constraints: {constraint: '!=', families: [P, y]} 
+
+- description: transmission from main to N2 (without high carriage conversion)
+  reactants: [<$P_$j_$k>, <$x_$y_$z>]
+  products: [<$P_$j_$k>, <$x_$y_$P>]
+  used_families: {'j': 'strain', 'k': 'strain', 'P': 'pathogenic', 'x': 'strain', 'y': 'strain', 'z': 'strain'}
+  k: 1/(1+rBN) * beta * ~V[#P][#z]~ * (1 - ~I[#x]~) * (1-pVN1)
+  family_constraints: {constraint: '!=', families: [P, z]}
+- description: transmission from main to N2 (WITH high carriage conversion)
+  reactants: [<$P_$j_$k>, <$x_$y_$z>]
+  products: [<$P_$j_$k>, <$P_$y_$P>]
+  used_families: {'j': 'strain', 'k': 'strain', 'P': 'pathogenic', 'x': 'strain', 'y': 'strain', 'z': 'strain'}
+  k: 1/(1+rBN) * beta * ~V[#P][#z]~ * (~I[#x]~) * (1-pVN1)
+  family_constraints: {constraint: '!=', families: [P, z]}
+
+- description: transmission from N1 to N1 (without high carriage conversion)
+  reactants: [<$i_$P_$k>, <$x_$y_$z>]
+  products: [<$i_$P_$k>, <$x_$P_$z>]
+  used_families: {'i': strain, 'k': 'strain', 'P': 'pathogenic', 'x': 'strain', 'y': 'strain', 'z': 'strain'}
+  k: pBN1 * rBN/(1+rBN) * beta * ~V[#P][#y]~ * (1 - ~I[#x]~) * pVN1
+  family_constraints: {constraint: '!=', families: [P, y]}
+- description: transmission from N1 to N1 (WITH high carriage conversion)
+  reactants: [<$i_$P_$k>, <$x_$y_$z>]
+  products: [<$i_$P_$k>, <$P_$P_$z>]
+  used_families: {'i': 'strain', 'k': 'strain', 'P': 'pathogenic', 'x': 'strain', 'y': 'strain', 'z': 'strain'}
+  k: pBN1 * rBN/(1+rBN) * beta * ~V[#P][#y]~ * (~I[#x]~) * pVN1
+  family_constraints: {constraint: '!=', families: [P, y]} 
+
+- description: transmission from N1 to N2 (without high carriage conversion)
+  reactants: [<$i_$P_$k>, <$x_$y_$z>]
+  products: [<$i_$P_$k>, <$x_$y_$P>]
+  used_families: {'i': strain, 'k': 'strain', 'P': 'pathogenic', 'x': 'strain', 'y': 'strain', 'z': 'strain'}
+  k: pBN1 * rBN/(1+rBN) * beta * ~V[#P][#z]~ * (1 - ~I[#x]~) * (1-pVN1)
+  family_constraints: {constraint: '!=', families: [P, z]}
+- description: transmission from N1 to N2 (WITH high carriage conversion)
+  reactants: [<$i_$P_$k>, <$x_$y_$z>]
+  products: [<$i_$P_$k>, <$P_$P_$z>]
+  used_families: {'i': 'strain', 'k': 'strain', 'P': 'pathogenic', 'x': 'strain', 'y': 'strain', 'z': 'strain'}
+  k: pBN1 * rBN/(1+rBN) * beta * ~V[#P][#z]~ * (~I[#x]~) * (1-pVN1)
+  family_constraints: {constraint: '!=', families: [P, z]} 
+
+- description: transmission from N2 to N1 (without high carriage conversion)
+  reactants: [<$i_$j_$P>, <$x_$y_$z>]
+  products: [<$i_$j_$P>, <$x_$P_$z>]
+  used_families: {'i': strain, 'j': 'strain', 'P': 'pathogenic', 'x': 'strain', 'y': 'strain', 'z': 'strain'}
+  k: (1-pBN1) * rBN/(1+rBN) * beta * ~V[#P][#y]~ * (1 - ~I[#x]~) * pVN1
+  family_constraints: {constraint: '!=', families: [P, y]}
+- description: transmission from N2 to N1 (WITH high carriage conversion)
+  reactants: [<$i_$j_$P>, <$x_$y_$z>]
+  products: [<$i_$j_$P>, <$P_$P_$z>]
+  used_families: {'i': 'strain', 'j': 'strain', 'P': 'pathogenic', 'x': 'strain', 'y': 'strain', 'z': 'strain'}
+  k: (1-pBN1) * rBN/(1+rBN) * beta * ~V[#P][#y]~ * (~I[#x]~) * pVN1
+  family_constraints: {constraint: '!=', families: [P, y]} 
+
+- description: transmission from N2 to N2 (without high carriage conversion)
+  reactants: [<$i_$j_$P>, <$x_$y_$z>]
+  products: [<$i_$j_$P>, <$x_$y_$P>]
+  used_families: {'i': strain, 'j': 'strain', 'P': 'pathogenic', 'x': 'strain', 'y': 'strain', 'z': 'strain'}
+  k: (1-pBN1) * rBN/(1+rBN) * beta * ~V[#P][#z]~ * (1 - ~I[#x]~) * (1-pVN1)
+  family_constraints: {constraint: '!=', families: [P, z]}
+- description: transmission from N2 to N2 (WITH high carriage conversion)
+  reactants: [<$i_$j_$P>, <$x_$y_$z>]
+  products: [<$i_$j_$P>, <$P_$y_$P>]
+  used_families: {'i': 'strain', 'j': 'strain', 'P': 'pathogenic', 'x': 'strain', 'y': 'strain', 'z': 'strain'}
+  k: (1-pBN1) * rBN/(1+rBN) * beta * ~V[#P][#z]~ * (~I[#x]~) * (1-pVN1)
+  family_constraints: {constraint: '!=', families: [P, z]} 
+
+## DETECTION + TREATMENT
+# assume detection is instantaneous and combined with the treatment process
+#- description: treatment - hits main - low efficacy
+#  reactants: [<$i_$j_$k>]
+#  products: [<@i_@j_@k>]
+#  k: foo
+#  used_families: {'i': ['strain', 'lowEfficacyTreatment'], 'j': ['strain', 'lowEfficacyTreatment'], 'k': ['strain', 'lowEfficacyTreatment']}
+
+
+# Probabalistic stoichiometry
+
+parameters:
+  A: {'path': './a.csv', 'shape': } # admissions
+  B: {'path': './b.csv'} # transmissions
+  BN: {'path': './bN.csv'} # transmissions from niche
+  W: {'path': './w.csv'} # competitions
+  g0: 0.1
+  gamma0: 0.1
+  l: 0.1
+  lam: 0.1
+  w: 0.1
+  rWM: 1.0
+  rWX: 1.0
+  dWR: 0.0

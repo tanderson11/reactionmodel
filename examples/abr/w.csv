@@ -1,0 +1,4 @@
+﻿0,w * rWM,w * rWM,w * rWX
+w * rWM,0,w,w * rWX
+w * rWM * (1 - dWR),w * (1 - dWR),0,w * (1 - dWR) * rWX
+0,0,0,0
