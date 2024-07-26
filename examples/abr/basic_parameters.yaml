@@ -1,0 +1,67 @@
+parameters:
+  Delta: {'path': './delta.csv'} # discharge rates by main carriage
+  Mu: {'path': './mu.csv'} # death rates due to infection by main carraige
+  V: {'path': './v.csv'} # invasion of row->column
+  I: {'path': './i.csv'} # probability invasion causes immediate infection with given majority col state
+  W: {'path': './w.csv'} # rate of competition between row->column in niche
+  pAMX: {'path': './pAMX.csv'} # admission of niche [row][col] with majority state M/X then use factor of 1-p_low_a or p_low_a to get pAM or pAX respectively
+  pADS: {'path': './pADS.csv'} # admission of niche [row][col] with majority state X
+  pADR: {'path': './pADR.csv'} # admission of niche [row][col] with majority state X
+  Tau: {'path': './tau.csv'} # background treatment and detected treatment rates by main carriage
+
+  Delt: 0.01 # discharge rate per person
+  rDeltaM: 1.0 # relative rate of discharge given M in high carriage
+  rDeltaDS: 1.0 # relative rate of discharge given DS in high carriage
+  rDeltaDR: 1.0 # relative rate of discharge given DR in high carriage
+  rDeltaX: 1.0 # relative rate of discharge given X in high carriage
+
+  mu: 0.01 # death rate per person
+  rMuM: 1.0 # relative death rate given M in high carriage
+  rMuDS: 10.0 # relative death rate given acute DS infection
+  rMuDR: 10.0 # relative death rate given acute DS infection
+  rMuX: 1.0 # relative death rate given X in high carriage
+
+  rho: 1.0 # importation rate
+  pAI: 0.2 # probability imported individual has acute infection
+  pAIR: 0.2 # probability imported acute infection is drug resistant
+  p_low_a: 0.0 # probability imported case has low absolute abundance of commensals
+  p_low_d: 0.0 # probability imported case has low commensal diversity
+  p_col: 0.2 # probability imported case has colonization of either DS or DR
+  pA_IS_R: 0.1 # probability imported DS infection has R colonization
+  pA_IR_S: 0.1 # probability imported DS infection has R colonization
+  f_S: 0.77 # fraction of imported colonizations that are S
+  f_R: 0.19 # fraction of imported colonizations that are R
+  f_dual: 0.04 # fraction of imported colonizations that are dual
+
+  g0: 0.2 # commensal background repopulates to high abundance
+  g:  0.01 # commensals in niche repopulates to high abundance
+  gamma0: 0.05 # background restoration of commensals (P in main)
+  gamma: 0.001 # restoration of commensals in niche to high abundance (P in main)
+
+  l: 0.1 # overgrowth of pathogenic bacteria in niche (X in main)
+  lam: 0.01 # overgrowth of pathogenic bacteria in niche (reasonable guess := r_beta_C * l)
+
+  theta: 0.001 # spontaneous disruption of high abundance
+  theta_N: 0.001 # spontaneous disruption of niche
+
+  w: 0.01 # absolute rate of competition within niche
+  rWM: 0.5 # relative competition rate between commensals and non commensals
+  rWX: 100.0 # relative competition rate between [] and X
+  dWN: 0 # decrease in competition strength from the disfavored niche half
+  dWR: 0.25 # decrease in competition strength for R
+  
+  rBN: 0.1 # relative transmission from the niche
+  pVN1: 0.5 # probability invasion targets niche 1 (as opposed to 2)
+  pBN1: 0.5 # probability invasion comes from niche 1 (vs 2)
+  beta: 0.005 # absolute rate of transmission per contact
+  p_beta_infection_M: 0.01 # percent of colonizations that spontaneously produce infection given M in high abundance
+  p_beta_infection_X: 0.001 # percent of colonizations that spontaneously produce infection given M in high abundance (reasonable guess := r_beta_C)
+  r_beta_C: 0.1 # colonization resistance: relative probability of invasion given anybody occupies niche
+  delta_beta_R: 0.25 # decrease in transmission rate for R
+
+  tau_0: 0.01
+  tau: 1.0 # detection+treatment rate for infected individuals
+  pEN: 0.1 # probability treatment affects the niche at all
+  eDS: 1.0 # treatment efficacy against DS
+  eM:  1.0 # treatment efficacy against M
+  eDR: 0.0 # treatment efficacy against DR
