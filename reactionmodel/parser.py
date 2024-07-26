@@ -31,9 +31,9 @@ def parse_parameters(parameters_dict):
             path = p_dict.pop('path')
             header = p_dict.pop('header', None)
             try:
-                value = np.array(pd.read_csv(path, header=header), dtype=float)
+                value = np.array(pd.read_csv(path, header=header), dtype=float).squeeze()
             except ValueError:
-                value = np.array(pd.read_csv(path, header=header))
+                value = np.array(pd.read_csv(path, header=header)).squeeze()
                 print("While loading parameter matrix, encountered non-float objects. Treating them as string representations of parameters.")
         else:
             try:
@@ -78,6 +78,8 @@ def loads(data, syntax=reactionmodel.syntax.Syntax(), ConfigParser=ConfigParser,
     kwargs = {}
 
     families = data.get('families', {})
+    assert isinstance(families, dict), "families should be a dictionary. In YAML, be careful not to include '-' on lines introducing families."
+
     if set(['species', 'reactions']).issubset(data.keys()):
         used_keys.extend(['species', 'reactions'])
         kwargs['model'] = model_class.parse_model(families, data['species'], data['reactions'], syntax=syntax)

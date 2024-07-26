@@ -3,12 +3,14 @@ from dataclasses import dataclass
 from dataclasses import asdict
 from functools import cached_property
 from keyword import iskeyword
+import re
 
 from typing import NamedTuple
 from types import FunctionType as function
 
 import numpy as np
 from scipy.special import binom
+import scipy.sparse
 from simpleeval import simple_eval
 
 import reactionmodel.syntax
@@ -30,9 +32,23 @@ def find_duplicates(collection):
         duplicates.add(x)
     return duplicates
 
+string_sub_pattern = re.compile('\~(.+?)\~')
+# in the context of {'y': 'foo'}, replace strings like "x * ~y~" with "x * foo"
+def process_string_substitutions(expression, parameters):
+    try:
+        processed = re.sub(string_sub_pattern, lambda m: str(simple_eval(m.group(1), names=parameters)), expression)
+    except:
+        print("oh no")
+    return processed
+
 def eval_expression(expression, parameters):
     """Evaluate lazily defined parameter as expression in the context of the provided parameters."""
     print(f"Evaluating expression: {expression} =>", end=" ")
+
+    if '~' in expression:
+        print(f"Substituting evalutions: {expression} =>", end=" ")
+        expression = process_string_substitutions(expression, parameters)
+        print(f"{expression} =>", end=" ")
 
     for k in parameters.keys():
         if iskeyword(k):
@@ -50,6 +66,9 @@ def eval_expression(expression, parameters):
             evaluated = float(evaluted_twice)
         except ValueError:
             raise ValueError(f"Python evaluation of the string {expression} did not produce a float literal (produced {evaluated}). Tried evaluating twice in case of doubly-lazy dictionary and got {evaluted_twice}") from exc
+    except Exception as e:
+        print(expression, evaluated)
+        raise(e)
     print(evaluated)
     return evaluated
 
@@ -526,7 +545,9 @@ class Model():
                 base_k[i] = r.eval_k_with_parameters(parameters)
             elif isinstance(k, (int, float)):
                 base_k[i] = float(k)
-            elif isinstance(k, function) or (jit and isinstance(k, CPUDispatcher)):
+            elif isinstance(k, function) or (isinstance(k, CPUDispatcher)):
+                if isinstance(k, CPUDispatcher) and not jit:
+                    print("WARNING: one k was a numba compiled function, but jit was not set equal to True with calling Model.get_k(). May not reach maximum performance.")
                 k_families.append(RateConstantCluster(k, i, i+1))
             else:
                 raise TypeError(f"a reaction's rate constant should be, a float, a string expression (evaluated --> float when given parameters), or function with signature k(t) --> float. Found: {k}")
@@ -607,7 +628,7 @@ class Model():
         X_ij = kinetic intensity of Species i in Reaction j"""
         return self.multiplicity_matrix(MultiplicityType.kinetic_order)
 
-    def get_propensities_function(self, reaction_to_k: dict=None, parameters: dict=None, jit: bool=False):
+    def get_propensities_function(self, reaction_to_k: dict=None, parameters: dict=None, jit: bool=False, sparse: bool=False):
         """Return function a(t, y) that returns the propensity of each reaction at time t given state=y.
 
         Parameters
@@ -630,13 +651,18 @@ class Model():
             once with probability a_r(t, y).
         """
         if jit:
+            if sparse: raise ValueError("both jit=True and sparse=True is not supported while getting propensity function")
             return self._get_jit_propensities_function(reaction_to_k, parameters)
-        return self._get_propensities_function(reaction_to_k, parameters)
+        return self._get_propensities_function(reaction_to_k, parameters, sparse=sparse)
 
-    def _get_propensities_function(self, reaction_to_k=None, parameters=None):
+    def _get_propensities_function(self, reaction_to_k=None, parameters=None, sparse=False):
         k = self.get_k(parameters=parameters, reaction_to_k=reaction_to_k, jit=False)
+        homogeneous = isinstance(k, np.ndarray)
+        #if homogeneous and sparse:
+        #    # sparse arrays MUST be 2D,
+        #    k = scipy.sparse.csr_array(k).T
         def calculate_propensities(t, y):
-            if isinstance(k, np.ndarray):
+            if homogeneous:
                 k_of_t = k
             else:
                 k_of_t = k(t)
@@ -680,7 +706,7 @@ class Model():
             return product_down_columns * k
         return jit_calculate_propensities
 
-    def get_dydt(self, reaction_to_k: dict=None, parameters: dict=None, jit: bool=False):
+    def get_dydt(self, reaction_to_k: dict=None, parameters: dict=None, jit: bool=False, sparse=False):
         """Returns dydt(t,y), a function that calculates the time derivative of the system.
 
         Parameters
@@ -701,12 +727,15 @@ class Model():
             The function dydt(t, y) that gives the time derivative of a system in state y at time t.
         """
         if jit:
+            if sparse: raise ValueError("both jit=True and sparse=True is not possible whiile getting dydt")
             return self._get_jit_dydt_function(reaction_to_k=reaction_to_k, parameters=parameters)
-        return self._get_dydt(reaction_to_k=reaction_to_k, parameters=parameters)
+        return self._get_dydt(reaction_to_k=reaction_to_k, parameters=parameters, sparse=sparse)
 
-    def _get_dydt(self, reaction_to_k=None, parameters=None):
-        calculate_propensities = self.get_propensities_function(reaction_to_k=reaction_to_k, parameters=parameters)
+    def _get_dydt(self, reaction_to_k=None, parameters=None, sparse=False):
+        calculate_propensities = self.get_propensities_function(reaction_to_k=reaction_to_k, parameters=parameters, sparse=sparse)
         N = self.stoichiometry()
+        if sparse:
+            N = scipy.sparse.csr_array(N)
         def dydt(t, y):
             propensities = calculate_propensities(t, y)
 
@@ -792,6 +821,7 @@ class Model():
         else:
             raise ValueError(f"format should be one of yaml or json was {format}")
         families = d.get('families', {})
+        assert isinstance(families, dict), "families should be a dictionary. In YAML, be careful not to include '-' on lines introducing families."
         return cls.parse_model(families, d['species'], d['reactions'], syntax=syntax)
 
 
