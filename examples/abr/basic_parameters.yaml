@@ -21,7 +21,7 @@ parameters:
   rMuDR: 10.0 # relative death rate given acute DS infection
   rMuX: 1.0 # relative death rate given X in high carriage
 
-  rho: 1.0 # importation rate
+  rho: 10.0 # importation rate
   pAI: 0.2 # probability imported individual has acute infection
   pAIR: 0.2 # probability imported acute infection is drug resistant
   p_low_a: 0.0 # probability imported case has low absolute abundance of commensals
@@ -59,7 +59,7 @@ parameters:
   r_beta_C: 0.1 # colonization resistance: relative probability of invasion given anybody occupies niche
   delta_beta_R: 0.25 # decrease in transmission rate for R
 
-  tau_0: 0.01
+  tau_0: 0.05
   tau: 1.0 # detection+treatment rate for infected individuals
   pEN: 0.1 # probability treatment affects the niche at all
   eDS: 1.0 # treatment efficacy against DS
