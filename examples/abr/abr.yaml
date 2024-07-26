@@ -6,18 +6,6 @@ families:
   midEfficacyTreatment: [X, X, DR, X]
   highEfficacyTreatment: [X, X, X, X]
 
-# Delta_i: vector of combined discharge+death rates (main carriage)
-# rho[i][j][k]: admission rate of i,j,k
-# rhoX = rho[X][j][k] etc.
-# rhoM
-# rhoDS
-# rhoDR
-# W[s1][s2]: rate that s1 replaces s2 in the niche through competition
-# V[P][y]: probability that y successfully invades target niche given y is resdient
-# I[x]: probability that P instantly causes infection given x is majority resident
-# 
-
-
 species:
 - name: "<$i_$j_$k>"
   used_families: {'i': 'strain', 'j': 'strain', 'k': 'strain'}
@@ -33,28 +21,28 @@ reactions:
   reactants: [<$i_$j_$k>]
   products: []
   used_families: {'i': 'strain', 'j': 'strain', 'k': 'strain'}
-  k: mu[#i]
+  k: Mu[#i]
 ## ADMISSION
 - description: admission
   reactants: []
   products: [<M_$j_$k>]
   used_families: {'j': 'strain', 'k': 'strain'}
-  k: rhoM[#j][#k]
+  k: rho * (1 - pAI) * (1 - p_low_a) * ~pAMX[#j][#k]~
 - description: admission
   reactants: []
   products: [<DS_$j_$k>]
   used_families: {'j': 'strain', 'k': 'strain'}
-  k: rhoDS[#j][#k]
+  k: rho * pAI * (1 - pAIR) * ~pADS[#j][#k]~
 - description: admission
   reactants: []
   products: [<DR_$j_$k>]
   used_families: {'j': 'strain', 'k': 'strain'}
-  k: rhoDR[#j][#k]
+  k: rho * pAI * pAIR * ~pADR[#j][#k]~
 - description: admission
   reactants: []
   products: [<X_$j_$k>]
   used_families: {'j': 'strain', 'k': 'strain'}
-  k: rhoX[#j][#k]
+  k: rho * (1 - pAI) * p_low_a * ~pAMX[#j][#k]~
 ## GROWTH
 - description: background repopulation with commensals
   reactants: [<X_$j_$k>]
@@ -66,6 +54,26 @@ reactions:
   products: [<M_$j_$k>]
   k: gamma0
   used_families: {'P': 'pathogenic', 'j': 'strain', 'k': 'strain'}
+- description: repopulation with commensals from niche (1)
+  reactants: [<X_M_$k>]
+  products: [<M_M_$k>]
+  k: 1/2 * g
+  used_families: {'k': 'strain'}
+- description: repopulation with commensals from niche (2)
+  reactants: [<X_$j_M>]
+  products: [<M_$j_M>]
+  k: 1/2 * g
+  used_families: {'j': 'strain'}
+- description: restoration with commensals from niche (1)
+  reactants: [<$P_M_$k>]
+  products: [<M_M_$k>]
+  k: 1/2 * gamma
+  used_families: {'P': 'pathogenic', 'k': 'strain'}
+- description: restoration with commensals from niche (2)
+  reactants: [<$P_$j_M>]
+  products: [<M_$j_M>]
+  k: 1/2 * gamma
+  used_families: {'P': 'pathogenic', 'j': 'strain'}
 - description: uninhibited growth of N1
   reactants: [<X_$j_$k>]
   products: [<$j_$j_$k>]
@@ -100,6 +108,22 @@ reactions:
   products: [<$P_$P_$P>]
   k: 2*lam
   used_families: {'P': 'pathogenic'}
+## SPONTANEOUS DISRUPTION
+- description: spontaneous disruption of commensal majority
+  reactants: [<M_$j_$k>]
+  products: [<X_$j_$k>]
+  k: theta
+  used_families: {'j': 'strain', 'k': 'strain'}
+- description: spontaneous disruption of niche (1)
+  reactants: [<$i_$j_$k>]
+  products: [<$i_X_$k>]
+  k: 1/2 * theta_N
+  used_families: {'i': 'strain', 'j': 'strain', 'k': 'strain'}
+- description: spontaneous disruption of niche (1)
+  reactants: [<$i_$j_$k>]
+  products: [<$i_$j_X>]
+  k: 1/2 * theta_N
+  used_families: {'i': 'strain', 'j': 'strain', 'k': 'strain'}
 ## COMPETITION
 - description: N1 displaces N2
   reactants: [<$i_$j_$k>]
@@ -193,25 +217,105 @@ reactions:
 
 ## DETECTION + TREATMENT
 # assume detection is instantaneous and combined with the treatment process
-#- description: treatment - hits main - low efficacy
-#  reactants: [<$i_$j_$k>]
-#  products: [<@i_@j_@k>]
-#  k: foo
-#  used_families: {'i': ['strain', 'lowEfficacyTreatment'], 'j': ['strain', 'lowEfficacyTreatment'], 'k': ['strain', 'lowEfficacyTreatment']}
+# this way of using families is concise but will create lots of non-op reactions that will need to be removed afterwards
+# this approach to treatment assumes that eDR <= eM <= eDS (and produces lots of reactions with rates == 0 if equality instead of inequality)
+- description: treatment - hits niche - low efficacy
+  reactants: [<$i_$j_$k>]
+  products: [<@i_@j_@k>]
+  k: tau * pEN * (eDS - eM)
+  used_families: {'i': ['strain', 'lowEfficacyTreatment'], 'j': ['strain', 'lowEfficacyTreatment'], 'k': ['strain', 'lowEfficacyTreatment']}
+- description: treatment - doesn't hit niche - low efficacy
+  reactants: [<$i_$j_$k>]
+  products: [<@i_$j_$k>]
+  k: tau * (1 - pEN) * (eDS - eM)
+  used_families: {'i': ['strain', 'lowEfficacyTreatment'], 'j': 'strain', 'k': 'strain'}
 
+- description: treatment - hits niche - moderate efficacy
+  reactants: [<$i_$j_$k>]
+  products: [<@i_@j_@k>]
+  k: tau * pEN * (eM - eDR)
+  used_families: {'i': ['strain', 'midEfficacyTreatment'], 'j': ['strain', 'midEfficacyTreatment'], 'k': ['strain', 'midEfficacyTreatment']}
+- description: treatment - doesn't hit niche - low efficacy
+  reactants: [<$i_$j_$k>]
+  products: [<@i_$j_$k>]
+  k: tau * (1 - pEN) * (eM - eDR)
+  used_families: {'i': ['strain', 'midEfficacyTreatment'], 'j': 'strain', 'k': 'strain'}
+
+- description: treatment - hits niche - high efficacy
+  reactants: [<$i_$j_$k>]
+  products: [<@i_@j_@k>]
+  k: tau * pEN * (eDR)
+  used_families: {'i': ['strain', 'highEfficacyTreatment'], 'j': ['strain', 'highEfficacyTreatment'], 'k': ['strain', 'highEfficacyTreatment']}
+- description: treatment - doesn't hit niche - high efficacy
+  reactants: [<$i_$j_$k>]
+  products: [<@i_$j_$k>]
+  k: tau * (1 - pEN) * (eDR)
+  used_families: {'i': ['strain', 'highEfficacyTreatment'], 'j': 'strain', 'k': 'strain'}
 
 # Probabalistic stoichiometry
 
 parameters:
-  A: {'path': './a.csv', 'shape': } # admissions
-  B: {'path': './b.csv'} # transmissions
-  BN: {'path': './bN.csv'} # transmissions from niche
-  W: {'path': './w.csv'} # competitions
-  g0: 0.1
-  gamma0: 0.1
-  l: 0.1
-  lam: 0.1
-  w: 0.1
-  rWM: 1.0
-  rWX: 1.0
-  dWR: 0.0
+  Delta: {'path': './delta.csv'} # discharge rates by main carriage
+  Mu: {'path': './mu.csv'} # death rates due to infection by main carraige
+  V: {'path': './v.csv'} # invasion of row->column
+  I: {'path': './i.csv'} # probability invasion causes immediate infection with given majority col state
+  W: {'path': './w.csv'} # rate of competition between row->column in niche
+  pAMX: {'path': './pAMX.csv'} # admission of niche [row][col] with majority state M/X then use factor of 1-p_low_a or p_low_a to get pAM or pAX respectively
+  pADS: {'path': './pADS.csv'} # admission of niche [row][col] with majority state X
+  pADR: {'path': './pADR.csv'} # admission of niche [row][col] with majority state X
+
+  Delt: 0.01 # discharge rate per person
+  rDeltaM: 1.0 # relative rate of discharge given M in high carriage
+  rDeltaDS: 1.0 # relative rate of discharge given DS in high carriage
+  rDeltaDR: 1.0 # relative rate of discharge given DR in high carriage
+  rDeltaX: 1.0 # relative rate of discharge given X in high carriage
+
+  mu: 0.01 # death rate per person
+  rMuM: 1.0 # relative death rate given M in high carriage
+  rMuDS: 10.0 # relative death rate given acute DS infection
+  rMuDR: 10.0 # relative death rate given acute DS infection
+  rMuX: 1.0 # relative death rate given X in high carriage
+
+  rho: 1.0 # importation rate
+  pAI: 0.2 # probability imported individual has acute infection
+  pAIR: 0.2 # probability imported acute infection is drug resistant
+  p_low_a: 0.0 # probability imported case has low absolute abundance of commensals
+  p_low_d: 0.0 # probability imported case has low commensal diversity
+  p_col: 0.2 # probability imported case has colonization of either DS or DR
+  pA_IS_R: 0.1 # probability imported DS infection has R colonization
+  pA_IR_S: 0.1 # probability imported DS infection has R colonization
+  f_S: 0.77 # fraction of imported colonizations that are S
+  f_R: 0.19 # fraction of imported colonizations that are R
+  f_dual: 0.04 # fraction of imported colonizations that are dual
+
+  g0: 0.2 # commensal background repopulates to high abundance
+  g:  0.01 # commensals in niche repopulates to high abundance
+  gamma0: 0.05 # background restoration of commensals (P in main)
+  gamma: 0.001 # restoration of commensals in niche to high abundance (P in main)
+
+  l: 0.1 # overgrowth of pathogenic bacteria in niche (X in main)
+  lam: 0.01 # overgrowth of pathogenic bacteria in niche (reasonable guess := r_beta_C * l)
+
+  theta: 0.001 # spontaneous disruption of high abundance
+  theta_N: 0.001 # spontaneous disruption of niche
+
+  w: 0.01 # absolute rate of competition within niche
+  rWM: 0.5 # relative competition rate between commensals and non commensals
+  rWX: 100.0 # relative competition rate between [] and X
+  dWN: 0 # decrease in competition strength from the disfavored niche half
+  dWR: 0.25 # decrease in competition strength for R
+  
+  rBN: 0.1 # relative transmission from the niche
+  pVN1: 0.5 # probability invasion targets niche 1 (as opposed to 2)
+  pBN1: 0.5 # probability invasion comes from niche 1 (vs 2)
+  beta: 0.005 # absolute rate of transmission per contact
+  p_beta_infection_M: 0.01 # percent of colonizations that spontaneously produce infection given M in high abundance
+  p_beta_infection_X: 0.001 # percent of colonizations that spontaneously produce infection given M in high abundance (reasonable guess := r_beta_C)
+  r_beta_C: 0.1 # colonization resistance: relative probability of invasion given anybody occupies niche
+  delta_beta_R: 0.25 # decrease in transmission rate for R
+
+  tau: 1.0 # detection+treatment rate for infected individuals
+  pEN: 0.1 # probability treatment affects the niche at all
+  eDS: 1.0 # treatment efficacy against DS
+  eM:  1.0 # treatment efficacy against M
+  eDR: 0.0 # treatment efficacy against DR
