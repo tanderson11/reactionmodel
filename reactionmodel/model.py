@@ -350,6 +350,8 @@ class Model():
     reaction_groups: list[Reaction, ReactionRateFamily]
         Ordered list of all reaction groups, where reactions are grouped together if the
         evaluation of their time dependent rate constants will be done in vectorized fashion.
+    reject_duplicates: bool, optional
+        If True, raise an error if the model has duplicated reactions. Defaults to True.
 
     Methods
     ----------
@@ -824,6 +826,8 @@ class Model():
         assert isinstance(families, dict), "families should be a dictionary. In YAML, be careful not to include '-' on lines introducing families."
         return cls.parse_model(families, d['species'], d['reactions'], syntax=syntax)
 
+    def __repr__(self) -> str:
+        return f'Model with {len(self.species)} species and {len(self.all_reactions)} reactions.'
 
 class JitNotImplementedError(Exception):
     """Could not craft numba.jit function because of limitations of numba's nopython mode."""

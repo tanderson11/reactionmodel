@@ -38,7 +38,7 @@ parameters:
   gamma0: 0.05 # background restoration of commensals (P in main)
   gamma: 0.001 # restoration of commensals in niche to high abundance (P in main)
 
-  l: 0.1 # overgrowth of pathogenic bacteria in niche (X in main)
+  l: 10.0 # overgrowth of pathogenic bacteria in niche (X in main)
   lam: 0.01 # overgrowth of pathogenic bacteria in niche (reasonable guess := r_beta_C * l)
 
   theta: 0.001 # spontaneous disruption of high abundance
@@ -53,13 +53,13 @@ parameters:
   rBN: 0.1 # relative transmission from the niche
   pVN1: 0.5 # probability invasion targets niche 1 (as opposed to 2)
   pBN1: 0.5 # probability invasion comes from niche 1 (vs 2)
-  beta: 0.005 # absolute rate of transmission per contact
+  beta: 0.01 # absolute rate of transmission per contact
   p_beta_infection_M: 0.01 # percent of colonizations that spontaneously produce infection given M in high abundance
   p_beta_infection_X: 0.001 # percent of colonizations that spontaneously produce infection given M in high abundance (reasonable guess := r_beta_C)
   r_beta_C: 0.1 # colonization resistance: relative probability of invasion given anybody occupies niche
   delta_beta_R: 0.25 # decrease in transmission rate for R
 
-  tau_0: 0.05
+  tau_0: 0.10
   tau: 1.0 # detection+treatment rate for infected individuals
   pEN: 0.1 # probability treatment affects the niche at all
   eDS: 1.0 # treatment efficacy against DS

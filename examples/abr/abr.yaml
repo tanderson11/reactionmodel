@@ -119,7 +119,7 @@ reactions:
   products: [<$i_X_$k>]
   k: 1/2 * theta_N
   used_families: {'i': 'strain', 'j': 'strain', 'k': 'strain'}
-- description: spontaneous disruption of niche (1)
+- description: spontaneous disruption of niche (2)
   reactants: [<$i_$j_$k>]
   products: [<$i_$j_X>]
   k: 1/2 * theta_N
