@@ -1,0 +1,34 @@
+families:
+  strain: [X, Y, Z]
+  treated: [Z, Y, Z]
+
+species:
+- name: "<$i_$j_$k>"
+  used_families: {'i': 'strain', 'j': 'strain', 'k': 'strain'}
+
+reactions:
+- description: death
+  reactants: [<$i_$j_$k>]
+  products: []
+  k: mu
+  used_families: {'i': 'strain', 'j': 'strain', 'k': 'strain'}  
+- description: uninhibited growth of N1
+  reactants: [<X_$j_$k>]
+  products: [<$j_$j_$k>]
+  k: k1
+  used_families: {'j': 'strain', 'k': 'strain'}
+  family_constraints: {constraint: '!=', families: [j, k]}
+- description: uninhibited growth of N1
+  reactants: [<X_$j_$k>]
+  products: [<$j_$j_$k>]
+  k: k2 * ~kexp~
+  used_families: {'j': 'strain', 'k': 'strain'}
+  family_constraints: {constraint: '==', families: [j, k]}
+- description: treatment
+  reactants: [<$i_Y_Y>]
+  products: [<@i_Y_Y>]
+  k: tau
+  used_families: {'i': ['strain', 'treated']}
+
+parameters:
+  kexp: 'x'

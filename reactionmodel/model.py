@@ -72,6 +72,14 @@ def eval_expression(expression, parameters):
     print(evaluated)
     return evaluated
 
+def _eval_matrix(matrix_name, parameters):
+    matrix = parameters[matrix_name]
+    evaluated = np.zeros_like(matrix)
+    it = np.nditer(matrix, flags=['refs_ok', 'multi_index'])
+    for exp in it:
+        evaluated[it.multi_index] = eval_expression(str(exp), parameters)
+    return evaluated
+
 @dataclass(frozen=True)
 class Species():
     """A species (i.e. object) in the physical system."""

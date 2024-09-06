@@ -1,4 +1,4 @@
-﻿(1 - p_col)*(1-p_low_d),1/2*p_col*(1-p_low_d)*f_S,1/2 * p_col * (1 - p_low_d) * f_R,0
-0,p_col * p_low_d * f_S,1/2 * p_col*f_dual,0
-p_col * p_low_d * f_S,1/2 * p_col*f_dual,p_col * p_low_d * f_R,0
+﻿(1 - p_col)*(1-p_low_d),1/2*p_col*(1-p_low_d)*f_S * (1-f_dual),1/2*p_col*(1-p_low_d)*f_R* (1-f_dual),0
+1/2*p_col*(1-p_low_d)*f_S * (1-f_dual),p_col * p_low_d * f_S * (1-f_dual),1/2 * p_col * f_dual,0
+1/2*p_col*(1-p_low_d)*f_R * (1-f_dual),1/2 * p_col * f_dual,p_col * p_low_d * f_R * (1-f_dual),0
 0,0,0,(1 - p_col) * p_low_d

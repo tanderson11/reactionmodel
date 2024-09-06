@@ -222,32 +222,32 @@ reactions:
 - description: treatment - hits niche - low efficacy
   reactants: [<$i_$j_$k>]
   products: [<@i_@j_@k>]
-  k: ~Tau[#i]~ * pEN * (eDS - eM)
+  k: (~Tau[#i]~) * pEN * (eDS - eM)
   used_families: {'i': ['strain', 'lowEfficacyTreatment'], 'j': ['strain', 'lowEfficacyTreatment'], 'k': ['strain', 'lowEfficacyTreatment']}
 - description: treatment - doesn't hit niche - low efficacy
   reactants: [<$i_$j_$k>]
   products: [<@i_$j_$k>]
-  k: ~Tau[#i]~ * (1 - pEN) * (eDS - eM)
+  k: (~Tau[#i]~) * (1 - pEN) * (eDS - eM)
   used_families: {'i': ['strain', 'lowEfficacyTreatment'], 'j': 'strain', 'k': 'strain'}
 
 - description: treatment - hits niche - moderate efficacy
   reactants: [<$i_$j_$k>]
   products: [<@i_@j_@k>]
-  k: ~Tau[#i]~ * pEN * (eM - eDR)
+  k: (~Tau[#i]~) * pEN * (eM - eDR)
   used_families: {'i': ['strain', 'midEfficacyTreatment'], 'j': ['strain', 'midEfficacyTreatment'], 'k': ['strain', 'midEfficacyTreatment']}
 - description: treatment - doesn't hit niche - low efficacy
   reactants: [<$i_$j_$k>]
   products: [<@i_$j_$k>]
-  k: ~Tau[#i]~ * (1 - pEN) * (eM - eDR)
+  k: (~Tau[#i]~) * (1 - pEN) * (eM - eDR)
   used_families: {'i': ['strain', 'midEfficacyTreatment'], 'j': 'strain', 'k': 'strain'}
 
 - description: treatment - hits niche - high efficacy
   reactants: [<$i_$j_$k>]
   products: [<@i_@j_@k>]
-  k: ~Tau[#i]~ * pEN * (eDR)
+  k: (~Tau[#i]~) * pEN * (eDR)
   used_families: {'i': ['strain', 'highEfficacyTreatment'], 'j': ['strain', 'highEfficacyTreatment'], 'k': ['strain', 'highEfficacyTreatment']}
 - description: treatment - doesn't hit niche - high efficacy
   reactants: [<$i_$j_$k>]
   products: [<@i_$j_$k>]
-  k: ~Tau[#i]~ * (1 - pEN) * (eDR)
+  k: (~Tau[#i]~) * (1 - pEN) * (eDR)
   used_families: {'i': ['strain', 'highEfficacyTreatment'], 'j': 'strain', 'k': 'strain'}

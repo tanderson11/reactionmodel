@@ -18,7 +18,7 @@ parameters:
   mu: 0.01 # death rate per person
   rMuM: 1.0 # relative death rate given M in high carriage
   rMuDS: 10.0 # relative death rate given acute DS infection
-  rMuDR: 10.0 # relative death rate given acute DS infection
+  rMuDR: 10.0 # relative death rate given acute DR infection
   rMuX: 1.0 # relative death rate given X in high carriage
 
   rho: 10.0 # importation rate
@@ -28,9 +28,9 @@ parameters:
   p_low_d: 0.0 # probability imported case has low commensal diversity
   p_col: 0.2 # probability imported case has colonization of either DS or DR
   pA_IS_R: 0.1 # probability imported DS infection has R colonization
-  pA_IR_S: 0.1 # probability imported DS infection has R colonization
-  f_S: 0.77 # fraction of imported colonizations that are S
-  f_R: 0.19 # fraction of imported colonizations that are R
+  pA_IR_S: 0.1 # probability imported DR infection has S colonization
+  f_S: 0.80 # fraction of imported colonizations that are S
+  f_R: 0.20 # fraction of imported colonizations that are R
   f_dual: 0.04 # fraction of imported colonizations that are dual
 
   g0: 0.2 # commensal background repopulates to high abundance
@@ -38,7 +38,7 @@ parameters:
   gamma0: 0.05 # background restoration of commensals (P in main)
   gamma: 0.001 # restoration of commensals in niche to high abundance (P in main)
 
-  l: 10.0 # overgrowth of pathogenic bacteria in niche (X in main)
+  l: 0.1 # overgrowth of pathogenic bacteria in niche (X in main)
   lam: 0.01 # overgrowth of pathogenic bacteria in niche (reasonable guess := r_beta_C * l)
 
   theta: 0.001 # spontaneous disruption of high abundance
