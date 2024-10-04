@@ -112,17 +112,15 @@ class MultiplicityType(Enum):
     kinetic_order = 'kinetic order'
 
 @dataclass(frozen=True)
-class Reaction():
-    """A reaction that converts reactants to products."""
+class RatelessReaction():
+    """A reaction without rate information. Useful as a standalone in agent-based simulation to trigger an event."""
     reactants: tuple[Species]
     products: tuple[Species]
     description: str = ''
-    kinetic_orders: tuple[Species] = None
     reversible: bool = False
-    k: float = None
 
     def __post_init__(self):
-        """Ensure everything that should be a tuple is. Add default kinetic orders if unspecified."""
+        """Adjust everything that should be a tuple to be a tuple."""
         if isinstance(self.reactants, Species) or isinstance(self.reactants, tuple):
             object.__setattr__(self, 'reactants', (self.reactants,))
         if not isinstance(self.reactants, tuple):
@@ -131,12 +129,7 @@ class Reaction():
             object.__setattr__(self, 'products', (self.products,))
         if not isinstance(self.products, tuple):
             object.__setattr__(self, 'products', tuple(self.products))
-        if (not isinstance(self.kinetic_orders, type(None))) and len(self.kinetic_orders) != 0:
-            object.__setattr__(self, 'kinetic_orders', tuple(self.kinetic_orders))
-        else:
-            object.__setattr__(self, 'kinetic_orders', None)
         assert(isinstance(self.reactants, tuple))
-        assert(isinstance(self.kinetic_orders, (tuple, type(None)))), self.kinetic_orders
         assert(isinstance(self.products, tuple))
 
         for reactant in self.reactants:
@@ -146,10 +139,6 @@ class Reaction():
 
         self.verify_integer(self.reactants)
         self.verify_integer(self.products)
-
-        # None or zero length
-        if self.kinetic_orders is None:
-            object.__setattr__(self, 'kinetic_orders', self.reactants)
 
         assert self.reversible is False, "Reversible reactions are not supported. Create separate forward and back reactions instead."
 
@@ -169,11 +158,9 @@ class Reaction():
         selfdict['reactants'] = [r.name if isinstance(r, Species) else (r[0].name, r[1]) for r in self.reactants]
         selfdict['products']  = [p.name if isinstance(p, Species) else (p[0].name, p[1]) for p in self.products ]
 
-        if self.kinetic_orders != self.reactants:
-            selfdict['kinetic_orders'] = self.kinetic_orders
         if self.reversible:
             selfdict['reversible'] = self.reversible
-        selfdict['k'] = self.k
+
         return selfdict
 
     def order(self):
@@ -193,22 +180,7 @@ class Reaction():
         """The set of Species involved as products."""
         return set([(p[0] if isinstance(p, tuple) else p) for p in self.products])
 
-    @cached_property
-    def kinetic_order_species(self):
-        """The set of species involved in the rate law."""
-        if self.kinetic_orders is None:
-            return set([])
-        return set([(r[0] if isinstance(r, tuple) else r) for r in self.kinetic_orders])
-
-    def eval_k_with_parameters(self, parameters):
-        """Evaluate lazy rate constant in the context of parameters."""
-        k = eval_expression(self.k, parameters)
-        return k
-
-    def multiplicities(self, mult_type):
-        """Return list of multiplicity of each species in reaction for multiplicity type (e.g. stoichiometry)"""
-        multplicities = {}
-
+    def _get_positive_negative_multiplicity_data(self, mult_type):
         positive_multplicity_data = []
         negative_multiplicity_data = []
         if mult_type == MultiplicityType.reacants:
@@ -218,10 +190,16 @@ class Reaction():
         elif mult_type == MultiplicityType.stoichiometry:
             positive_multplicity_data = self.products
             negative_multiplicity_data = self.reactants
-        elif mult_type == MultiplicityType.kinetic_order:
-            positive_multplicity_data = self.kinetic_orders
         else:
             raise ValueError(f"bad value for type of multiplicities to calculate: {mult_type}.")
+
+        return positive_multplicity_data, negative_multiplicity_data
+
+    def multiplicities(self, mult_type):
+        """Return list of multiplicity of each species in reaction for multiplicity type (e.g. stoichiometry)"""
+        multplicities = {}
+
+        positive_multplicity_data, negative_multiplicity_data = self._get_positive_negative_multiplicity_data(mult_type)
 
         for species in negative_multiplicity_data:
             if isinstance(species, tuple):
@@ -259,8 +237,7 @@ class Reaction():
         return multiplicity_info
 
     @classmethod
-    def from_dict(cls, dictionary, species_context):
-        """Given dictionary representation of a Reaction and a species_context of Species objects, return a Reaction"""
+    def _preprocess_dictionary_for_loading(cls, dictionary, species_context):
         reactants = cls.rebuild_multiplicity(
             species_context=species_context,
             multiplicity_list=dictionary['reactants']
@@ -269,29 +246,98 @@ class Reaction():
             species_context=species_context,
             multiplicity_list=dictionary['products']
         )
-        kinetic_orders_info = dictionary.get('kinetic_orders', {})
-        kinetic_orders = cls.rebuild_multiplicity(
-            species_context=species_context,
-            multiplicity_list=kinetic_orders_info
-        )
 
         reaction = dictionary.copy()
         reaction['products'] = products
         reaction['reactants'] = reactants
-        reaction['kinetic_orders'] = kinetic_orders
+        return reaction
+
+    @classmethod
+    def from_dict(cls, dictionary, species_context):
+        """Given dictionary representation of a Reaction and a species_context of Species objects, return a Reaction"""
+        reaction = cls._preprocess_dictionary_for_loading(dictionary, species_context)
         return cls(**reaction)
 
     def stoichiometry(self):
         """Return the multiplicity of each species in stoichiometry of the reaction."""
         return self.multiplicities(MultiplicityType.stoichiometry)
 
+    def used(self):
+        """Return the set of all Species involved in some way in this Reaction."""
+        return self.product_species.union(self.reactant_species).union(self.kinetic_order_species)
+
+    def __repr__(self) -> str:
+        return (f"Reaction(description={self.description}, reactants={self.reactants}, products={self.products})")
+
+    def __str__(self) -> str:
+        return f"Reaction(description={self.description}, reactants={self.reactants}, products={self.products})"
+
+@dataclass(frozen=True)
+class Reaction(RatelessReaction):
+    """A reaction that converts reactants to products."""
+    kinetic_orders: tuple[Species] = None
+    k: float = None
+
+    def __post_init__(self):
+        """Add default kinetic orders if unspecified."""
+        super().__post_init__()
+
+        if (not isinstance(self.kinetic_orders, type(None))) and len(self.kinetic_orders) != 0:
+            object.__setattr__(self, 'kinetic_orders', tuple(self.kinetic_orders))
+        else:
+            object.__setattr__(self, 'kinetic_orders', None)
+        assert(isinstance(self.kinetic_orders, (tuple, type(None)))), self.kinetic_orders
+
+        # None or zero length
+        if self.kinetic_orders is None:
+            object.__setattr__(self, 'kinetic_orders', self.reactants)
+
+    def to_dict(self):
+        """Return dictionary representation of self."""
+        selfdict = super().to_dict()
+
+        if self.kinetic_orders != self.reactants:
+            selfdict['kinetic_orders'] = self.kinetic_orders
+
+        selfdict['k'] = self.k
+        return selfdict
+
+    @classmethod
+    def _preprocess_dictionary_for_loading(cls, dictionary, species_context):
+        reaction = super()._preprocess_dictionary_for_loading(dictionary, species_context)
+
+        kinetic_orders_info = dictionary.get('kinetic_orders', {})
+        kinetic_orders = cls.rebuild_multiplicity(
+            species_context=species_context,
+            multiplicity_list=kinetic_orders_info
+        )
+        reaction['kinetic_orders'] = kinetic_orders
+        return reaction
+
+    def _get_positive_negative_multiplicity_data(self, mult_type):
+        if mult_type != MultiplicityType.kinetic_order:
+            return super()._get_positive_negative_multiplicity_data(mult_type)
+
+        positive_multplicity_data = self.kinetic_orders
+        negative_multiplicity_data = []
+
+        return positive_multplicity_data, negative_multiplicity_data
+
+    @cached_property
+    def kinetic_order_species(self):
+        """The set of species involved in the rate law."""
+        if self.kinetic_orders is None:
+            return set([])
+        return set([(r[0] if isinstance(r, tuple) else r) for r in self.kinetic_orders])
+
     def kinetic_order(self):
         """Return the kinetic intensity of each species in the reaction."""
         return self.multiplicities(MultiplicityType.kinetic_order)
 
-    def used(self):
-        """Return the set of all Species involved in some way in this Reaction."""
-        return self.product_species.union(self.reactant_species).union(self.kinetic_order_species)
+    def eval_k_with_parameters(self, parameters):
+        """Evaluate lazy rate constant in the context of parameters."""
+        k = eval_expression(self.k, parameters)
+        return k
 
     def __repr__(self) -> str:
         return (f"Reaction(description={self.description}, reactants={self.reactants}, products={self.products}, kinetic_order={self.kinetic_orders}, k={self.k})")
@@ -598,11 +644,12 @@ class Model():
 
         return k_jit
 
-    def multiplicity_matrix(self, mult_type: MultiplicityType):
+
+    def multiplicity_matrix(self, mult_type: MultiplicityType, reactions):
         """For a kind of multiplicity, return a matrix A_ij of multiplicity of Species i in Reaction j."""
-        matrix = np.zeros((self.n_species, self.n_reactions))
-        for column, reaction in enumerate(self.all_reactions):
-            multiplicity_column = np.zeros(self.n_species)
+        matrix = np.zeros((len(self.species), len(reactions)))
+        for column, reaction in enumerate(reactions):
+            multiplicity_column = np.zeros(len(self.species))
             reaction_info = reaction.multiplicities(mult_type)
             for species, multiplicity in reaction_info.items():
                 multiplicity_column[self.species_index[species]] = multiplicity
@@ -630,13 +677,13 @@ class Model():
         """Return stoichiometry matrix N of model.
 
         N_ij = stoichiometry of Species i in Reaction j"""
-        return self.multiplicity_matrix(MultiplicityType.stoichiometry)
+        return self.multiplicity_matrix(MultiplicityType.stoichiometry, self.all_reactions)
 
     def kinetic_order(self):
         """Return kinetic intensity matrix X of model.
 
         X_ij = kinetic intensity of Species i in Reaction j"""
-        return self.multiplicity_matrix(MultiplicityType.kinetic_order)
+        return self.multiplicity_matrix(MultiplicityType.kinetic_order, self.all_reactions)
 
     def get_propensities_function(self, reaction_to_k: dict=None, parameters: dict=None, jit: bool=False, sparse: bool=False):
         """Return function a(t, y) that returns the propensity of each reaction at time t given state=y.
