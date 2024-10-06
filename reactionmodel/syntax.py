@@ -9,7 +9,6 @@ class ReactionRateFamilyApplicationMethod(Enum):
 def enumerated_product(members):
     yield from zip(itertools.product(*(range(len(x)) for x in members)), itertools.product(*members))
 
-
 class FamilyConstraint():
     def __init__(self, families):
         self.families = families
