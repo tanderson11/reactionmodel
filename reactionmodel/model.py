@@ -264,7 +264,7 @@ class RatelessReaction():
 
     def used(self):
         """Return the set of all Species involved in some way in this Reaction."""
-        return self.product_species.union(self.reactant_species).union(self.kinetic_order_species)
+        return self.product_species.union(self.reactant_species)
 
     def __repr__(self) -> str:
         return (f"Reaction(description={self.description}, reactants={self.reactants}, products={self.products})")
@@ -291,6 +291,10 @@ class Reaction(RatelessReaction):
         # None or zero length
         if self.kinetic_orders is None:
             object.__setattr__(self, 'kinetic_orders', self.reactants)
+
+    def used(self):
+        """Return the set of all Species involved in some way in this Reaction."""
+        return super().used().union(self.kinetic_order_species)
 
     def to_dict(self):
         """Return dictionary representation of self."""
