@@ -36,7 +36,7 @@ string_sub_pattern = re.compile('\~(.+?)\~')
 # in the context of {'y': 'foo'}, replace strings like "x * ~y~" with "x * foo"
 def process_string_substitutions(expression, parameters):
     try:
-        processed = re.sub(string_sub_pattern, lambda m: str(simple_eval(m.group(1), names=parameters)), expression)
+        processed = re.sub(string_sub_pattern, lambda m: '(' + str(simple_eval(m.group(1), names=parameters)) + ')', expression)
     except:
         print("oh no")
     return processed
