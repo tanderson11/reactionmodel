@@ -43,6 +43,9 @@ def process_string_substitutions(expression, parameters):
 
 def eval_expression(expression, parameters):
     """Evaluate lazily defined parameter as expression in the context of the provided parameters."""
+    if isinstance(expression, (float, np.floating)):
+        return expression
+
     print(f"Evaluating expression: {expression} =>", end=" ")
 
     if '~' in expression:
