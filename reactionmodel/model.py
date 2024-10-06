@@ -143,6 +143,9 @@ class RatelessReaction():
         self.verify_integer(self.reactants)
         self.verify_integer(self.products)
 
+        assert len(self.reactants) == len(set(self.reactants))
+        assert len(self.products) == len(set(self.products))
+
         assert self.reversible is False, "Reversible reactions are not supported. Create separate forward and back reactions instead."
 
     @staticmethod

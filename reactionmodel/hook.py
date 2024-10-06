@@ -91,7 +91,10 @@ class HookAwareModel(Model):
             if r.hooked_reactions is None:
                 continue
             p = r.eval_p_with_parameters(parameters=parameters)
-            reaction_index_to_hooks[i] = self.build_hook(r.hooked_reactions, p)
+            try:
+                reaction_index_to_hooks[i] = self.build_hook(r.hooked_reactions, p)
+            except:
+                print("here bad")
         return reaction_index_to_hooks
 
     @classmethod

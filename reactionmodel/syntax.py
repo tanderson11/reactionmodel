@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from collections import Counter
 import itertools
 from enum import Enum
 
@@ -45,7 +46,8 @@ class Syntax():
     family_enumerator = '#'
     family_alternator = '@'
 
-    def family_replace(self, family_names, idx, chosen_members, value, do_nestings=False, paired_family_mapping=None):
+    def family_replace(self, family_names, idx, chosen_members, value, do_nestings=False, deduplicate=False, paired_family_mapping=None):
+        if deduplicate: assert do_nestings
         if paired_family_mapping is None:
             paired_family_mapping = {}
         for family_name, member, i in zip(family_names, chosen_members, idx):
@@ -67,6 +69,9 @@ class Syntax():
                     print(f"WARNING: found family alternator symbol {self.family_alternator} but no family was paired.")
             value = value.replace(self.family_denoter + family_name, denoted_member)
             value = value.replace(self.family_enumerator + family_name, str(i))
+
+        if deduplicate:
+            value = [(k, v) if v>1 else k for k,v in Counter(value).items()]
 
         return value
 
@@ -138,9 +143,10 @@ class Syntax():
             new_atom = {}
             for field, value in atom.items():
                 nested = field in nested_fields
+                deduplicate = field in ['reactants', 'products']
                 if nested: assert isinstance(value, list), f"For nested field {field} found flat data. Did you remember to include [] in specifying a list of length 1?"
                 new_field = self.family_replace(used_families, idx, combination, field, do_nestings=False, paired_family_mapping=paired_family_mapping)
-                new_atom[new_field] = self.family_replace(used_families, idx, combination, value, do_nestings=(field in nested_fields), paired_family_mapping=paired_family_mapping)
+                new_atom[new_field] = self.family_replace(used_families, idx, combination, value, do_nestings=(field in nested_fields), deduplicate=deduplicate, paired_family_mapping=paired_family_mapping)
             new_atoms.append(new_atom)
 
         return new_atoms
