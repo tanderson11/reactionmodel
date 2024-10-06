@@ -41,6 +41,7 @@ class ReactionWithHooks(Reaction):
         return used
 
 class HookAwareModel(Model):
+    has_hooks=True
     def __init__(self, species: list[Species], reactions: list[Reaction], reject_duplicates=True) -> None:
         super().__init__(species, reactions, reject_duplicates)
 

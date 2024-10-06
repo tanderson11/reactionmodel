@@ -422,6 +422,7 @@ class Model():
     get_dydt(reaction_to_k=None, parameters=None, jit=False)
         Return a function dydt(t, y) that gives the time derivative of species quantities at time t.
     """
+    has_hooks=False
     def __init__(self, species: list[Species], reactions: list[Reaction], reject_duplicates=True) -> None:
         """Make a model for the given species and reactions.
 
