@@ -5,7 +5,7 @@ from reactionmodel.model import Species, RatelessReaction, Reaction, Model, Mult
 @dataclass(frozen=True)
 class Hook():
     """A Hook has a stoichiometry matrix and a probability vector.
-    
+
     Upon a triggering condition, an index is selected from the probability vector and the resultant update vector is provided."""
     N: np.ndarray
     p: np.ndarray
@@ -40,20 +40,31 @@ class ReactionWithHooks(Reaction):
             used = used.union(r.used())
         return used
 
+    def eval_p_with_parameters(self, parameters):
+        """Evaluate lazy rate constant in the context of parameters."""
+        p = [eval_expression(_p, parameters) for _p in self.hooked_p]
+        p = np.array(p)
+        return p
+
 class HookAwareModel(Model):
     has_hooks=True
     def __init__(self, species: list[Species], reactions: list[Reaction], reject_duplicates=True) -> None:
         super().__init__(species, reactions, reject_duplicates)
 
+    def build_hook(self, reactions: list[RatelessReaction], p):
+        N = self.multiplicity_matrix(MultiplicityType.stoichiometry, reactions)
+        return Hook(N, np.array(p))
+
+    def get_hooks(self, parameters: dict=None):
+        if parameters is None:
+            parameters = {}
         # TK make sure this works with reaction groups
-        self.reaction_index_to_hooks = {}
+        reaction_index_to_hooks = {}
         for i,r in enumerate(self.all_reactions):
             if not isinstance(r, ReactionWithHooks):
                 continue
             if r.hooked_reactions is None:
                 continue
-            self.reaction_index_to_hooks[i] = self.build_hook(r.hooked_reactions, r.hooked_p)
-    
-    def build_hook(self, reactions: list[RatelessReaction], p):
-        N = self.multiplicity_matrix(MultiplicityType.stoichiometry, reactions)
-        return Hook(N, np.array(p))
+            p = r.eval_p_with_parameters(parameters=parameters)
+            reaction_index_to_hooks[i] = self.build_hook(r.hooked_reactions, p)
+        return reaction_index_to_hooks
