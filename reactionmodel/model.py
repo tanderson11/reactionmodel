@@ -253,13 +253,14 @@ class RatelessReaction():
         reaction = dictionary.copy()
         reaction['products'] = products
         reaction['reactants'] = reactants
+
         return reaction
 
     @classmethod
     def from_dict(cls, dictionary, species_context):
         """Given dictionary representation of a Reaction and a species_context of Species objects, return a Reaction"""
-        reaction = cls._preprocess_dictionary_for_loading(dictionary, species_context)
-        return cls(**reaction)
+        reaction_dict = cls._preprocess_dictionary_for_loading(dictionary, species_context)
+        return cls(**reaction_dict)
 
     def stoichiometry(self):
         """Return the multiplicity of each species in stoichiometry of the reaction."""

@@ -82,7 +82,11 @@ def loads(data, syntax=reactionmodel.syntax.Syntax(), ConfigParser=ConfigParser,
 
     if set(['species', 'reactions']).issubset(data.keys()):
         used_keys.extend(['species', 'reactions'])
-        kwargs['model'] = model_class.parse_model(families, data['species'], data['reactions'], syntax=syntax)
+        triggered_sets = None
+        if 'triggered_sets' in data.keys():
+            used_keys.append('triggered_sets')
+            triggered_sets = data['triggered_sets']
+        kwargs['model'] = model_class.parse_model(families, data['species'], data['reactions'], syntax=syntax, triggered_sets=triggered_sets)
 
     if 'parameters' in data.keys():
         used_keys.append('parameters')

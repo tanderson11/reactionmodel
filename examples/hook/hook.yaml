@@ -1,0 +1,39 @@
+# all the species in our system
+# the `-`s indicate the start of a new species
+species:
+- name: A
+  description: a lengthy description of A
+- name: B
+- name: C
+- name: D
+
+# reactions in our system that are only triggered by other reactions
+# each set is triggered by a specific condition and should have probability 1
+# reactions can point to named triggered sets to indicate that after the reaction fires
+# the triggered set fires once
+
+# NEED TO FIGURE OUT HOW TO MAKE KEYS GET FAMILY EXPANDED AS WELL!
+triggered_sets:
+  after_C:
+    - description: triggered conversion of C => D
+      reactants: [C]
+      products: [D]
+      p: p1
+    - description: nothing happens
+      reactants: []
+      products: []
+      p: 1-p1
+
+# all the main reactions in our system
+# the `-`s indicate the start of a new species
+# reactants and products must be enclosed in []
+reactions:
+- description: A + B => C (rate constant 2.0)
+  reactants: [A, B]
+  products: [C]
+  k: 2.0
+- description: C => empty set (rate constant 0.5)
+  reactants: [C]
+  products: []
+  k: 0.5
+  hooked_set: after_C

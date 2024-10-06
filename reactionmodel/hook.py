@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import numpy as np
+import reactionmodel.syntax
 from reactionmodel.model import Species, RatelessReaction, Reaction, Model, MultiplicityType, eval_expression
 
 @dataclass(frozen=True)
@@ -36,6 +37,8 @@ class ReactionWithHooks(Reaction):
 
     def used(self):
         used = super().used()
+        if self.hooked_reactions is None:
+            return used
         for r in self.hooked_reactions:
             used = used.union(r.used())
         return used
@@ -45,6 +48,28 @@ class ReactionWithHooks(Reaction):
         p = [eval_expression(_p, parameters) for _p in self.hooked_p]
         p = np.array(p)
         return p
+
+    @classmethod
+    def _preprocess_dictionary_for_loading(cls, dictionary, species_context, reaction_class=RatelessReaction):
+        self_dict = super()._preprocess_dictionary_for_loading(dictionary, species_context)
+
+        # now we need to make all the inner reaction dictionaries into actual reactions
+        hooked_reactions = dictionary.pop('hooked_reactions', None)
+        if hooked_reactions is None:
+            return self_dict
+        our_reactions = []
+        for r_dict in hooked_reactions:
+            our_reactions.append(reaction_class.from_dict(r_dict, species_context))
+
+        self_dict['hooked_reactions'] = our_reactions
+        return self_dict
+
+    @classmethod
+    def from_dict(cls, dictionary, species_context):
+        """Given dictionary representation of a Reaction and a species_context of Species objects, return a Reaction"""
+        reaction_dict = cls._preprocess_dictionary_for_loading(dictionary, species_context)
+
+        return cls(**reaction_dict)
 
 class HookAwareModel(Model):
     has_hooks=True
@@ -68,3 +93,38 @@ class HookAwareModel(Model):
             p = r.eval_p_with_parameters(parameters=parameters)
             reaction_index_to_hooks[i] = self.build_hook(r.hooked_reactions, p)
         return reaction_index_to_hooks
+
+    @classmethod
+    def parse_model(cls, families, species, reactions, syntax=reactionmodel.syntax.Syntax(), triggered_sets=None, **kwargs):
+        parsed_triggered_sets = {}
+        parsed_triggered_ps = {}
+        for k,s in triggered_sets.items():
+            #p = np.zeros(len(s))
+            triggered_reactions = []
+            for r in s:
+                triggered_reactions.extend(syntax.expand_families(families, r))
+            parsed_triggered_sets[k] = triggered_reactions
+            p = [r.pop('p') for r in triggered_reactions]
+            parsed_triggered_ps[k] = p
+
+        all_species = []
+        for s in species:
+            all_species.extend(syntax.expand_families(families, s))
+        all_reactions = []
+        for r in reactions:
+            all_reactions.extend(syntax.expand_families(families, r))
+
+        for r in all_reactions:
+            hooked_set = r.pop('hooked_set', None)
+            if hooked_set is None:
+                continue
+            r['hooked_reactions'] = parsed_triggered_sets[hooked_set]
+            r['hooked_p'] = parsed_triggered_ps[hooked_set]
+
+        model_dict = {
+            'species'  : all_species,
+            'reactions': all_reactions,
+        }
+        return cls.from_dict(model_dict, **kwargs, reaction_class=ReactionWithHooks)
+
+### Parsing hooks is a little bit
