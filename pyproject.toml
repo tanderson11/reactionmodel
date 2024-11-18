@@ -14,8 +14,14 @@ scipy = "^1.11.4"
 pyyaml = "^6.0.1"
 ipympl = "^0.9.4"
 
+[tool.poetry.group.extras]
+optional = true
+
 [tool.poetry.group.extras.dependencies]
 numba = "^0.58.1"
+
+[tool.poetry.group.dev]
+optional = true
 
 [tool.poetry.group.dev.dependencies]
 ipython = "^8.17.2"
