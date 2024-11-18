@@ -12,7 +12,6 @@ simpleeval = "^0.9.13"
 pandas = "^2.1.4"
 scipy = "^1.11.4"
 pyyaml = "^6.0.1"
-ipympl = "^0.9.4"
 
 [tool.poetry.group.extras]
 optional = true
