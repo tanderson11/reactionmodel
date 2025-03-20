@@ -1,6 +1,7 @@
 import json
 from functools import reduce
 from dataclasses import dataclass
+import copy
 
 import yaml
 from yaml import SafeLoader as Loader
@@ -73,6 +74,7 @@ class ConfigParser():
         return cls.from_dict(data[cls.key])
 
 def loads(data, syntax=reactionmodel.syntax.Syntax(), ConfigParser=ConfigParser, model_class=Model):
+    data = copy.deepcopy(data)
     used_keys = []
 
     kwargs = {}

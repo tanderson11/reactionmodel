@@ -59,6 +59,8 @@ class ReactionWithHooks(Reaction):
             return self_dict
         our_reactions = []
         for r_dict in hooked_reactions:
+            r_dict = r_dict.copy()
+            r_dict.pop('p')
             our_reactions.append(reaction_class.from_dict(r_dict, species_context))
 
         self_dict['hooked_reactions'] = our_reactions
@@ -107,7 +109,8 @@ class HookAwareModel(Model):
             for r in s:
                 triggered_reactions.extend(syntax.expand_families(families, r))
             parsed_triggered_sets[k] = triggered_reactions
-            p = [r.pop('p') for r in triggered_reactions]
+            #p = [r.pop('p') for r in triggered_reactions]
+            p = [r['p'] for r in triggered_reactions]
             parsed_triggered_ps[k] = p
 
         all_species = []

@@ -533,7 +533,11 @@ class Model():
                 except KeyError as exc:
                     raise KeyError(f'failed to find function with name {reaction_dict["k"]} when loading a Model that has a ReactionRateFamily. Did you a pass the keyword argument functions_by_name?') from exc
                 continue
-            reactions.append(reaction_class.from_dict(reaction_dict, species))
+            try:
+                reactions.append(reaction_class.from_dict(reaction_dict, species))
+            except Exception as e:
+                print(f"While trying to parse reaction {reaction_dict} ...")
+                raise(e)
 
         species = [s for s in species.values()]
         return cls(species, reactions, **dictionary)
