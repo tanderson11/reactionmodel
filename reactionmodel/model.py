@@ -9,7 +9,6 @@ from typing import NamedTuple
 from types import FunctionType as function
 
 import numpy as np
-from scipy.special import binom
 import scipy.sparse
 from simpleeval import simple_eval
 
@@ -552,7 +551,7 @@ class Model():
         return True
 
     def get_k(self, reaction_to_k: dict=None, parameters: dict=None, jit=False):
-        """Return a function k(t) => rate constants of reactions at time t.
+        """Return a function k(t, y=None) => rate constants of reactions at time t and state y. In general, k should have no functional dependency on y.
 
         Parameters
         ----------
@@ -569,8 +568,8 @@ class Model():
         Returns
         -------
         Callable or np.ndarray
-            The function k(t) => rate constants of reactions at time t. Returns array of constants
-            if no rate constant has explicit time dependence.
+            The function k(t, y) => rate constants of reactions at time t and state y. Returns array of constants
+            if no rate constant has explicit time dependence and no state dependence.
 
         Raises
         ------
@@ -654,9 +653,9 @@ class Model():
         k_function, k_slice_bottom, k_slice_top = k_functions[0], k_slice_bottoms[0], k_slice_tops[0]
 
         @numba.jit(nopython=True)
-        def k_jit(t):
+        def k_jit(t, y=None):
             k = base_k.copy()
-            k[k_slice_bottom:k_slice_top] = k_function(t)
+            k[k_slice_bottom:k_slice_top] = k_function(t, y=y)
             return k
 
         return k_jit
@@ -678,10 +677,10 @@ class Model():
     def _get_k(self, base_k, k_families):
         if len(k_families) == 0:
             return base_k.copy()
-        def k(t):
+        def k(t, y=None):
             k = base_k.copy()
             for family in k_families:
-                kt = family.k(t)
+                kt = family.k(t, y=y)
                 if kt.shape != k[family.slice_bottom:family.slice_top].shape: raise ValueError(f"k function of ReactionRateFamily {family} failed to produce output of the right size")
                 k[family.slice_bottom:family.slice_top] = kt
             return k

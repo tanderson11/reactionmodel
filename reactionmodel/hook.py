@@ -132,5 +132,3 @@ class HookAwareModel(Model):
             'reactions': all_reactions,
         }
         return cls.from_dict(model_dict, **kwargs, reaction_class=ReactionWithHooks)
-
-### Parsing hooks is a little bit

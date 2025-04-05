@@ -53,11 +53,11 @@ def _jit_construct_propensity_function(k, kinetic_order_matrix):
                         intensity *= (y[i] - x) / (x+1)
                     intensity_power[i][j] = intensity
         if not homogeneous:
-            k_of_t = k(t)
+            k_evaled = k(t, y)
         else:
-            k_of_t = k
-        product_down_columns = np.ones(len(k_of_t))
+            k_evaled = k
+        product_down_columns = np.ones(len(k_evaled))
         for i in range(0, len(y)):
             product_down_columns = product_down_columns * intensity_power[i]
-        return product_down_columns * k_of_t
+        return product_down_columns * k_evaled
     return jit_calculate_propensities
