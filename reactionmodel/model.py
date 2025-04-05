@@ -14,6 +14,7 @@ import scipy.sparse
 from simpleeval import simple_eval
 
 import reactionmodel.syntax
+import reactionmodel.propensity
 
 NO_NUMBA = False
 try:
@@ -725,59 +726,7 @@ class Model():
         """
         if jit:
             if sparse: raise ValueError("both jit=True and sparse=True is not supported while getting propensity function")
-            return self._get_jit_propensities_function(reaction_to_k, parameters)
-        return self._get_propensities_function(reaction_to_k, parameters, sparse=sparse)
-
-    def _get_propensities_function(self, reaction_to_k=None, parameters=None, sparse=False):
-        k = self.get_k(parameters=parameters, reaction_to_k=reaction_to_k, jit=False)
-        homogeneous = isinstance(k, np.ndarray)
-        #if homogeneous and sparse:
-        #    # sparse arrays MUST be 2D,
-        #    k = scipy.sparse.csr_array(k).T
-        def calculate_propensities(t, y):
-            if homogeneous:
-                k_of_t = k
-            else:
-                k_of_t = k(t)
-            # product along column in kinetic order matrix
-            # with states raised to power of involvement
-            # multiplied by rate constants == propensity
-            # dimension of y is expanded to make it a column vector
-            return np.prod(binom(np.expand_dims(y, axis=1), self.kinetic_order()), axis=0) * k_of_t
-        return calculate_propensities
-
-    def _get_jit_propensities_function(self, reaction_to_k=None, parameters=None):
-        kinetic_order_matrix = self.kinetic_order()
-        k_jit = self.get_k(reaction_to_k=reaction_to_k, parameters=parameters, jit=True)
-        @numba.jit(nopython=True)
-        def jit_calculate_propensities(t, y):
-            # Remember, we want total number of distinct combinations * k === rate.
-            # we want to calculate (y_i kinetic_order_ij) (binomial coefficient)
-            # for each species i and each reaction j
-            # sadly, inside a numba C function, we can't avail ourselves of scipy's binom,
-            # so we write this little calculator ourselves
-            intensity_power = np.zeros_like(kinetic_order_matrix)
-            for i in range(0, kinetic_order_matrix.shape[0]):
-                for j in range(0, kinetic_order_matrix.shape[1]):
-                    if y[i] < kinetic_order_matrix[i][j]:
-                        intensity_power[i][j] = 0.0
-                    elif y[i] == kinetic_order_matrix[i][j]:
-                        intensity_power[i][j] = 1.0
-                    else:
-                        intensity = 1.0
-                        for x in range(0, kinetic_order_matrix[i][j]):
-                            intensity *= (y[i] - x) / (x+1)
-                        intensity_power[i][j] = intensity
-
-            # then we take the product down the columns (so product over each reaction)
-            # and multiply that output by the vector of rate constants
-            # to get the propensity of each reaction at time t
-            k = k_jit(t)
-            product_down_columns = np.ones(len(k))
-            for i in range(0, len(y)):
-                product_down_columns = product_down_columns * intensity_power[i]
-            return product_down_columns * k
-        return jit_calculate_propensities
+        return reactionmodel.propensity.construct_propensity_function(self.get_k(parameters=parameters, reaction_to_k=reaction_to_k, jit=jit), self.kinetic_order(), jit=jit)
 
     def get_dydt(self, reaction_to_k: dict=None, parameters: dict=None, jit: bool=False, sparse=False):
         """Returns dydt(t,y), a function that calculates the time derivative of the system.
