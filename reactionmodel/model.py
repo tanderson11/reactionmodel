@@ -156,13 +156,17 @@ class RatelessReaction():
             multiplicity = t[1]
             assert(isinstance(multiplicity, (int, np.integer)))
 
-    def to_dict(self):
+    def to_dict(self, keep_species_objects=False):
         """Return dictionary representation of self."""
         selfdict = {}
         if self.description:
             selfdict['description'] = self.description
-        selfdict['reactants'] = [r.name if isinstance(r, Species) else (r[0].name, r[1]) for r in self.reactants]
-        selfdict['products']  = [p.name if isinstance(p, Species) else (p[0].name, p[1]) for p in self.products ]
+        if not keep_species_objects:
+            selfdict['reactants'] = [r.name if isinstance(r, Species) else (r[0].name, r[1]) for r in self.reactants]
+            selfdict['products']  = [p.name if isinstance(p, Species) else (p[0].name, p[1]) for p in self.products ]
+        else:
+            selfdict['reactants'] = list(self.reactants)
+            selfdict['products']  = list(self.products)
 
         if self.reversible:
             selfdict['reversible'] = self.reversible
@@ -303,9 +307,9 @@ class Reaction(RatelessReaction):
         """Return the set of all Species involved in some way in this Reaction."""
         return super().used().union(self.kinetic_order_species)
 
-    def to_dict(self):
+    def to_dict(self, keep_species_objects=False):
         """Return dictionary representation of self."""
-        selfdict = super().to_dict()
+        selfdict = super().to_dict(keep_species_objects=keep_species_objects)
 
         if self.kinetic_orders != self.reactants:
             selfdict['kinetic_orders'] = self.kinetic_orders
@@ -619,7 +623,7 @@ class Model():
                 base_k[i] = float(k)
             elif isinstance(k, function) or (isinstance(k, CPUDispatcher)):
                 if isinstance(k, CPUDispatcher) and not jit:
-                    print("WARNING: one k was a numba compiled function, but jit was not set equal to True with calling Model.get_k(). May not reach maximum performance.")
+                    print("WARNING: one k was a numba compiled function, but jit was not set equal to True when calling Model.get_k(). May not reach maximum performance.")
                 k_families.append(RateConstantCluster(k, i, i+1))
             else:
                 raise TypeError(f"a reaction's rate constant should be, a float, a string expression (evaluated --> float when given parameters), or function with signature k(t) --> float. Found: {k}")
