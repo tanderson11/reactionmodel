@@ -22,7 +22,7 @@ def _construct_propensity_function(k, kinetic_order_matrix):
         if homogeneous:
             k_of_t = k
         else:
-            k_of_t = k(t)
+            k_of_t = k(t, y)
         # product along column in kinetic order matrix
         # with states raised to power of involvement
         # multiplied by rate constants == propensity
