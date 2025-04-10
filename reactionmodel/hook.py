@@ -3,6 +3,9 @@ import numpy as np
 import reactionmodel.syntax
 from reactionmodel.model import Species, RatelessReaction, Reaction, Model, MultiplicityType, eval_expression
 
+class BadHookProbabilityException(Exception):
+    pass
+
 @dataclass(frozen=True)
 class Hook():
     """A Hook has a stoichiometry matrix and a probability vector.
@@ -12,7 +15,8 @@ class Hook():
     p: np.ndarray
 
     def __post_init__(self):
-        assert np.isclose(self.p.sum(), 1), "total probability of the hook must be 1"
+        if not np.isclose(self.p.sum(), 1):
+            raise(BadHookProbabilityException( f"total probability of the hook must be 1, is {self.p.sum()}"))
 
 @dataclass(frozen=True)
 class ReactionWithHooks(Reaction):
@@ -73,6 +77,12 @@ class ReactionWithHooks(Reaction):
 
         return cls(**reaction_dict)
 
+    def to_dict(self, keep_species_objects=False):
+        selfdict = super().to_dict(keep_species_objects)
+        selfdict['hooked_reactions'] = self.hooked_reactions
+        selfdict['hooked_p'] = self.hooked_p
+        return selfdict
+
 class HookAwareModel(Model):
     has_hooks=True
     def __init__(self, species: list[Species], reactions: list[Reaction], reject_duplicates=True) -> None:
@@ -93,10 +103,11 @@ class HookAwareModel(Model):
             if r.hooked_reactions is None:
                 continue
             p = r.eval_p_with_parameters(parameters=parameters)
-            try:
-                reaction_index_to_hooks[i] = self.build_hook(r.hooked_reactions, p)
-            except:
-                print("here bad")
+            #try:
+            reaction_index_to_hooks[i] = self.build_hook(r.hooked_reactions, p)
+            #except BadHookProbabilityException as e:
+            #    raise BadHookProbabilityException(str(r))
+
         return reaction_index_to_hooks
 
     @classmethod
